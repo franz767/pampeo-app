@@ -34,7 +34,7 @@ export function useAuth() {
         .from('perfiles')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
       let jugador = null;
       let dueno = null;
@@ -45,7 +45,7 @@ export function useAuth() {
             .from('jugadores')
             .select('*')
             .eq('perfil_id', userId)
-            .single();
+            .maybeSingle();
           jugador = data;
         }
 
@@ -54,7 +54,7 @@ export function useAuth() {
             .from('duenos')
             .select('*')
             .eq('perfil_id', userId)
-            .single();
+            .maybeSingle();
           dueno = data;
         }
       }
@@ -133,7 +133,12 @@ export function useAuth() {
     email: string,
     password: string,
     nombreCompleto: string,
-    rol: 'jugador' | 'dueno' = 'jugador'
+    rol: 'jugador' | 'dueno' = 'jugador',
+    extra?: {
+      apodo?: string;
+      posicion?: string;
+      telefono?: string;
+    }
   ) => {
     setState(prev => ({ ...prev, loading: true }));
     const { data, error } = await supabase.auth.signUp({
@@ -143,6 +148,9 @@ export function useAuth() {
         data: {
           nombre_completo: nombreCompleto,
           rol,
+          ...(extra?.apodo && { apodo: extra.apodo }),
+          ...(extra?.posicion && { posicion: extra.posicion }),
+          ...(extra?.telefono && { telefono: extra.telefono }),
         },
       },
     });

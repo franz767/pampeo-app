@@ -11,7 +11,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { Link } from 'expo-router';
+import { Link, useRouter } from 'expo-router';
 import { useAuth } from '../../src/hooks/useAuth';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -21,7 +21,13 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  const router = useRouter();
   const { signInWithEmail, signInWithGoogle } = useAuth();
+
+  const navigateAfterLogin = () => {
+    // Redirigir al splash para que decida según el rol (jugador vs dueño)
+    router.replace('/splash');
+  };
 
   const handleEmailLogin = async () => {
     if (!email || !password) {
@@ -32,6 +38,7 @@ export default function LoginScreen() {
     setIsLoading(true);
     try {
       await signInWithEmail(email, password);
+      navigateAfterLogin();
     } catch (error: any) {
       Alert.alert('Error', error.message || 'No se pudo iniciar sesion');
     } finally {
@@ -43,6 +50,7 @@ export default function LoginScreen() {
     setIsLoading(true);
     try {
       await signInWithGoogle();
+      navigateAfterLogin();
     } catch (error: any) {
       Alert.alert('Error', error.message || 'No se pudo iniciar sesion con Google');
     } finally {
@@ -138,7 +146,7 @@ export default function LoginScreen() {
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>No tienes cuenta?</Text>
-          <Link href="/(auth)/register" asChild>
+          <Link href="/(auth)/role-selection" asChild>
             <TouchableOpacity>
               <Text style={styles.linkText}> Registrate</Text>
             </TouchableOpacity>

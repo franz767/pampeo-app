@@ -56,6 +56,7 @@ export interface Database {
           goles: number;
           asistencias: number;
           partidos_ganados: number;
+          saldo: number;
           created_at: string;
           updated_at: string;
         };
@@ -70,6 +71,7 @@ export interface Database {
           goles?: number;
           asistencias?: number;
           partidos_ganados?: number;
+          saldo?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -84,6 +86,7 @@ export interface Database {
           goles?: number;
           asistencias?: number;
           partidos_ganados?: number;
+          saldo?: number;
           created_at?: string;
           updated_at?: string;
         };

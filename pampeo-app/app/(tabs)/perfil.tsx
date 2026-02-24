@@ -1,63 +1,141 @@
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
-import { useAuth } from '../../src/hooks/useAuth';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Image } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+// @ts-ignore
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { useAuth } from '../../src/hooks/useAuth';
+import StatCircle from '../../src/components/profile/StatCircle';
+import PlayerDNA from '../../src/components/profile/PlayerDNA';
+import MatchHistoryCard from '../../src/components/profile/MatchHistoryCard';
+import { colors } from '../../src/theme';
+
+const NIVEL_MAP: Record<string, string> = {
+  principiante: 'PRINCIPIANTE',
+  intermedio: 'INTERMEDIO',
+  avanzado: 'AVANZADO',
+};
+
+// Datos de ejemplo para últimos partidos (se reemplazarán con datos reales)
+const SAMPLE_MATCHES = [
+  { opponent: 'Turbos FC', date: 'Oct 24', venue: 'Cancha 3', result: 'win' as const, score: '3 - 1' },
+  { opponent: 'Liga Dominical', date: 'Oct 18', venue: 'Cancha 1', result: 'loss' as const, score: '2 - 4' },
+  { opponent: 'Night Owls', date: 'Oct 12', venue: 'Cancha 2', result: 'win' as const, score: '5 - 2' },
+];
 
 export default function PerfilScreen() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { perfil, jugador, signOut } = useAuth();
 
   const handleSignOut = () => {
     Alert.alert(
-      'Cerrar sesion',
-      'Estas seguro que quieres cerrar sesion?',
+      'Cerrar sesión',
+      '¿Estás seguro que quieres cerrar sesión?',
       [
         { text: 'Cancelar', style: 'cancel' },
-        { text: 'Cerrar sesion', style: 'destructive', onPress: signOut },
+        {
+          text: 'Cerrar sesión',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await signOut();
+              router.replace('/(auth)/role-selection');
+            } catch (e) {
+              Alert.alert('Error', 'No se pudo cerrar sesión');
+            }
+          },
+        },
       ]
     );
   };
 
+  const nivel = jugador?.nivel ? NIVEL_MAP[jugador.nivel] || jugador.nivel : 'AVANZADO';
+
   return (
     <View style={styles.container}>
-      <View style={styles.avatarContainer}>
-        <View style={styles.avatar}>
-          <Ionicons name="person" size={48} color="#9CA3AF" />
-        </View>
-        <Text style={styles.name}>{perfil?.nombre_completo || 'Usuario'}</Text>
-        <Text style={styles.email}>{perfil?.email}</Text>
+      {/* Header */}
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.headerButton}>
+          <Ionicons name="chevron-back" size={24} color={colors.gray900} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Perfil</Text>
+        <TouchableOpacity onPress={handleSignOut} style={styles.headerButton}>
+          <Ionicons name="settings-outline" size={24} color={colors.gray900} />
+        </TouchableOpacity>
       </View>
 
-      <View style={styles.statsContainer}>
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>{jugador?.partidos_jugados || 0}</Text>
-          <Text style={styles.statLabel}>Partidos</Text>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Avatar */}
+        <View style={styles.avatarSection}>
+          <View style={styles.avatarWrapper}>
+            {perfil?.avatar_url ? (
+              <Image source={{ uri: perfil.avatar_url }} style={styles.avatarImage} />
+            ) : (
+              <View style={styles.avatarPlaceholder}>
+                <Ionicons name="person" size={48} color={colors.gray400} />
+              </View>
+            )}
+            <View style={styles.verifiedBadge}>
+              <Ionicons name="checkmark" size={14} color={colors.white} />
+            </View>
+          </View>
+          <Text style={styles.name}>{perfil?.nombre_completo || 'Jugador'}</Text>
+          <View style={styles.levelBadge}>
+            <Ionicons name="diamond" size={14} color={colors.greenPrimary} />
+            <Text style={styles.levelText}>{nivel}</Text>
+          </View>
         </View>
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>{jugador?.goles || 0}</Text>
-          <Text style={styles.statLabel}>Goles</Text>
-        </View>
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>{jugador?.asistencias || 0}</Text>
-          <Text style={styles.statLabel}>Asistencias</Text>
-        </View>
-      </View>
 
-      <View style={styles.infoContainer}>
-        <View style={styles.infoItem}>
-          <Ionicons name="football-outline" size={20} color="#6B7280" />
-          <Text style={styles.infoLabel}>Posicion</Text>
-          <Text style={styles.infoValue}>{jugador?.posicion || 'Sin definir'}</Text>
+        {/* Billetera Card */}
+        <View style={styles.walletCard}>
+          <View style={styles.walletHeader}>
+            <View style={styles.walletIcon}>
+              <Ionicons name="wallet" size={20} color={colors.greenPrimary} />
+            </View>
+            <Text style={styles.walletLabel}>Mi Billetera</Text>
+          </View>
+          <Text style={styles.walletAmount}>S/{(jugador?.saldo || 0).toFixed(2)}</Text>
+          <TouchableOpacity style={styles.walletBtn} disabled>
+            <Ionicons name="add-circle-outline" size={16} color={colors.gray400} />
+            <Text style={styles.walletBtnText}>Recargar (Próximamente)</Text>
+          </TouchableOpacity>
         </View>
-        <View style={styles.infoItem}>
-          <Ionicons name="trophy-outline" size={20} color="#6B7280" />
-          <Text style={styles.infoLabel}>Nivel</Text>
-          <Text style={styles.infoValue}>{jugador?.nivel || 'Sin definir'}</Text>
-        </View>
-      </View>
 
-      <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
-        <Ionicons name="log-out-outline" size={20} color="#EF4444" />
-        <Text style={styles.signOutText}>Cerrar sesion</Text>
-      </TouchableOpacity>
+        {/* Stats Card */}
+        <View style={styles.statsCard}>
+          <View style={styles.statsRow}>
+            <StatCircle value={jugador?.goles || 42} label="GOLES" />
+            <StatCircle value={jugador?.partidos_ganados || 18} label="GANADOS" />
+            <StatCircle value={0} label="MVPS" icon="🏆" />
+          </View>
+        </View>
+
+        {/* Player DNA */}
+        <PlayerDNA
+          posicion={jugador?.posicion || 'delantero'}
+          zonaPreferida={jugador?.zona_preferida || 'Diestro'}
+          onEdit={() => {}}
+        />
+
+        {/* Last Matches */}
+        <View style={styles.matchesSection}>
+          <View style={styles.matchesHeader}>
+            <Text style={styles.matchesTitle}>Últimos Partidos</Text>
+            <TouchableOpacity>
+              <Text style={styles.seeAll}>Ver Todo</Text>
+            </TouchableOpacity>
+          </View>
+          {SAMPLE_MATCHES.map((match, index) => (
+            <MatchHistoryCard key={index} {...match} />
+          ))}
+        </View>
+
+        <View style={{ height: 100 }} />
+      </ScrollView>
     </View>
   );
 }
@@ -65,90 +143,187 @@ export default function PerfilScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
-    padding: 24,
+    backgroundColor: colors.gray50,
   },
-  avatarContainer: {
+  header: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 32,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 12,
+    backgroundColor: colors.white,
   },
-  avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#F3F4F6',
+  headerButton: {
+    width: 40,
+    height: 40,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+  },
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.gray900,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 40,
+  },
+  // Avatar
+  avatarSection: {
+    alignItems: 'center',
+    paddingVertical: 24,
+    backgroundColor: colors.white,
+    paddingHorizontal: 20,
+  },
+  avatarWrapper: {
+    position: 'relative',
+    marginBottom: 12,
+  },
+  avatarImage: {
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    borderWidth: 3,
+    borderColor: colors.greenBorder,
+  },
+  avatarPlaceholder: {
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    backgroundColor: colors.gray100,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: colors.greenBorder,
+  },
+  verifiedBadge: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.greenPrimary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: colors.white,
   },
   name: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1F2937',
-    marginBottom: 4,
+    fontWeight: '800',
+    color: colors.gray900,
+    marginBottom: 8,
   },
-  email: {
-    fontSize: 16,
-    color: '#6B7280',
-  },
-  statsContainer: {
+  levelBadge: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.greenLight,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.greenBorder,
+  },
+  levelText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.greenPrimary,
+    letterSpacing: 0.5,
+  },
+  // Wallet
+  walletCard: {
+    backgroundColor: colors.white,
+    marginHorizontal: 20,
+    marginTop: 20,
     borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
+    padding: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  statItem: {
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#10B981',
-  },
-  statLabel: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginTop: 4,
-  },
-  infoContainer: {
-    gap: 16,
-    marginBottom: 32,
-  },
-  infoItem: {
+  walletHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
-    padding: 16,
-    gap: 12,
+    gap: 8,
+    marginBottom: 8,
   },
-  infoLabel: {
-    flex: 1,
-    fontSize: 16,
-    color: '#6B7280',
+  walletIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.greenLight,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  infoValue: {
-    fontSize: 16,
+  walletLabel: {
+    fontSize: 14,
     fontWeight: '600',
-    color: '#1F2937',
-    textTransform: 'capitalize',
+    color: colors.gray500,
   },
-  signOutButton: {
+  walletAmount: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: colors.gray900,
+    marginBottom: 12,
+  },
+  walletBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#FEE2E2',
-    backgroundColor: '#FEF2F2',
+    gap: 6,
+    backgroundColor: colors.gray100,
+    paddingVertical: 10,
+    borderRadius: 10,
   },
-  signOutText: {
-    fontSize: 16,
+  walletBtnText: {
+    fontSize: 13,
     fontWeight: '600',
-    color: '#EF4444',
+    color: colors.gray400,
+  },
+  // Stats
+  statsCard: {
+    backgroundColor: colors.white,
+    marginHorizontal: 20,
+    marginTop: 20,
+    borderRadius: 16,
+    paddingVertical: 24,
+    paddingHorizontal: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  // Matches
+  matchesSection: {
+    paddingHorizontal: 20,
+    marginBottom: 24,
+  },
+  matchesHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  matchesTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.gray900,
+  },
+  seeAll: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.gray400,
   },
 });
