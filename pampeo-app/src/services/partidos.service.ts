@@ -21,6 +21,24 @@ interface CrearPartidoInput {
   precio_por_jugador: number;
 }
 
+interface CrearReservaInput {
+  cancha_id: string;
+  creador_id: string;
+  formato: '5v5' | '6v6';
+  fecha: string;
+  hora_inicio: string;
+  hora_fin: string;
+  precio_cancha: number;
+  adelanto_pagado: number;
+  comision_pampeo: number;
+}
+
+export interface ReservaConDetalles extends Partido {
+  cancha: Cancha & { sede: Sede };
+  adelanto_pagado?: number;
+  restante_por_pagar?: number;
+}
+
 const PARTIDO_SELECT = `
   *,
   cancha:canchas(
@@ -302,5 +320,74 @@ export const partidosService = {
 
     if (error) throw error;
     return (data as unknown as PartidoConDetalles[]) || [];
+  },
+
+  // Crear una reserva de cancha (modelo 50% adelanto)
+  async crearReserva(input: CrearReservaInput): Promise<Partido> {
+    const maxJugadores = input.formato === '5v5' ? 10 : 12;
+
+    const { data, error } = await supabase
+      .from('partidos')
+      .insert({
+        cancha_id: input.cancha_id,
+        creador_id: input.creador_id,
+        formato: input.formato,
+        fecha: input.fecha,
+        hora_inicio: input.hora_inicio,
+        hora_fin: input.hora_fin,
+        tipo: 'reserva',
+        estado: 'reservado',
+        max_jugadores: maxJugadores,
+        jugadores_confirmados: 0,
+        precio_por_jugador: Math.ceil(input.precio_cancha / maxJugadores),
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  // Descontar saldo del jugador
+  async descontarSaldo(jugadorId: string, monto: number): Promise<void> {
+    const { data: jugador, error: fetchError } = await supabase
+      .from('jugadores')
+      .select('saldo')
+      .eq('id', jugadorId)
+      .single();
+
+    if (fetchError) throw fetchError;
+    if (!jugador) throw new Error('Jugador no encontrado');
+
+    const nuevoSaldo = (jugador.saldo || 0) - monto;
+    if (nuevoSaldo < 0) throw new Error('Saldo insuficiente');
+
+    const { error } = await supabase
+      .from('jugadores')
+      .update({ saldo: nuevoSaldo })
+      .eq('id', jugadorId);
+
+    if (error) throw error;
+  },
+
+  // Obtener mis reservas
+  async getMisReservas(creadorId: string): Promise<ReservaConDetalles[]> {
+    const { data, error } = await supabase
+      .from('partidos')
+      .select(`
+        *,
+        cancha:canchas(
+          *,
+          sede:sedes(*)
+        )
+      `)
+      .eq('creador_id', creadorId)
+      .eq('tipo', 'reserva')
+      .neq('estado', 'cancelado')
+      .order('fecha', { ascending: true })
+      .order('hora_inicio', { ascending: true });
+
+    if (error) throw error;
+    return (data as unknown as ReservaConDetalles[]) || [];
   },
 };
