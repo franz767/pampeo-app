@@ -14,9 +14,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   Switch,
+  Dimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../src/hooks/useAuth';
@@ -29,6 +31,8 @@ import { Cancha } from '../../src/types/database.types';
 // @ts-ignore
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../src/theme';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const PENDING_SEDE_KEY = 'pendingSedeData';
 
@@ -119,6 +123,7 @@ export default function DashboardScreen() {
 
   // Partido stats per cancha
   const [canchaStats, setCanchaStats] = useState<Record<string, { abiertos: number; llenos: number }>>({});
+  const [reservasHoy, setReservasHoy] = useState(0);
 
   // Sede seleccionada (si ya tiene una)
   const [selectedSedeId, setSelectedSedeId] = useState<string | null>(null);
@@ -128,8 +133,10 @@ export default function DashboardScreen() {
   // Fetch partido stats for all canchas
   useEffect(() => {
     if (loading || sedes.length === 0) return;
+    const hoy = new Date().toISOString().split('T')[0];
     const fetchStats = async () => {
       const stats: Record<string, { abiertos: number; llenos: number }> = {};
+      let reservasHoyCount = 0;
       for (const sede of sedes) {
         for (const cancha of (sede.canchas || [])) {
           try {
@@ -138,12 +145,15 @@ export default function DashboardScreen() {
               abiertos: partidos.filter(p => p.estado === 'abierto').length,
               llenos: partidos.filter(p => p.estado === 'lleno').length,
             };
+            const reservas = await partidosService.getReservasPorCancha(cancha.id);
+            reservasHoyCount += reservas.filter(r => r.fecha === hoy).length;
           } catch {
             stats[cancha.id] = { abiertos: 0, llenos: 0 };
           }
         }
       }
       setCanchaStats(stats);
+      setReservasHoy(reservasHoyCount);
     };
     fetchStats();
   }, [loading, sedes]);
@@ -464,22 +474,50 @@ export default function DashboardScreen() {
     );
   }
 
+  const firstName = perfil?.nombre_completo?.split(' ')[0] || 'Dueño';
+  const avatarInitial = firstName[0]?.toUpperCase() || 'D';
+
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.greeting}>
-            Hola, {perfil?.nombre_completo?.split(' ')[0] || 'Dueño'}
-          </Text>
-          <Text style={styles.subtitle}>
-            {totalCanchas} {totalCanchas === 1 ? 'cancha registrada' : 'canchas registradas'}
-          </Text>
+      {/* Premium Gradient Header */}
+      <LinearGradient
+        colors={['#0F2A14', '#1A3A1F', '#22C55E']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.header, { paddingTop: insets.top + 16 }]}
+      >
+        <View style={styles.headerTop}>
+          <View style={styles.headerUserRow}>
+            <View style={styles.avatarCircle}>
+              <Text style={styles.avatarText}>{avatarInitial}</Text>
+            </View>
+            <View style={styles.headerUserInfo}>
+              <Text style={styles.headerGreeting}>Hola, {firstName}</Text>
+              <Text style={styles.headerRole}>Administrador</Text>
+            </View>
+          </View>
+          <TouchableOpacity style={styles.logoutBtn} onPress={handleSignOut}>
+            <Ionicons name="log-out-outline" size={20} color="rgba(255,255,255,0.7)" />
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.logoutBtn} onPress={handleSignOut}>
-          <Ionicons name="log-out-outline" size={22} color={colors.gray500} />
-        </TouchableOpacity>
-      </View>
+
+        <View style={styles.statsRow}>
+          <View style={styles.statBox}>
+            <Text style={styles.statNumber}>{totalCanchas}</Text>
+            <Text style={styles.statLabel}>Canchas</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statBox}>
+            <Text style={styles.statNumber}>{reservasHoy}</Text>
+            <Text style={styles.statLabel}>Reservas hoy</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statBox}>
+            <Text style={styles.statNumber}>{sedes.length}</Text>
+            <Text style={styles.statLabel}>{sedes.length === 1 ? 'Sede' : 'Sedes'}</Text>
+          </View>
+        </View>
+      </LinearGradient>
 
       <ScrollView
         style={styles.scrollView}
@@ -494,11 +532,6 @@ export default function DashboardScreen() {
           />
         }
       >
-        {/* Section Title - Nombre de la sede principal */}
-        <Text style={styles.sectionTitle}>
-          {(sedes.length > 0 ? sedes[0].nombre : 'Mis Canchas').toUpperCase()}
-        </Text>
-
         {allCanchas.length === 0 ? (
           <View style={styles.emptyState}>
             <View style={styles.emptyIcon}>
@@ -514,126 +547,145 @@ export default function DashboardScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          allCanchas.map((cancha, index) => (
-            <View key={cancha.id} style={styles.canchaCard}>
-              <Image
-                source={{ uri: cancha.foto_url || CANCHA_IMAGES[index % CANCHA_IMAGES.length] }}
-                style={styles.canchaImage}
-              />
-              <View style={[
-                styles.statusBadge,
-                cancha.aprobado ? styles.statusApproved : styles.statusPending,
-              ]}>
-                <View style={[
-                  styles.statusDot,
-                  { backgroundColor: cancha.aprobado ? colors.greenPrimary : '#F59E0B' },
-                ]} />
-                <Text style={[
-                  styles.statusText,
-                  { color: cancha.aprobado ? colors.greenPrimary : '#F59E0B' },
-                ]}>
-                  {cancha.aprobado ? 'Aprobada' : 'Pendiente'}
-                </Text>
-              </View>
+          sedes.map((sede) => {
+            const canchasDeSede = (sede.canchas || []).map((c) => ({
+              ...c,
+              sedeName: sede.nombre,
+              sedeAddress: sede.direccion,
+            }));
+            if (canchasDeSede.length === 0) return null;
 
-              <View style={styles.canchaInfo}>
-                <Text style={styles.canchaName}>{cancha.nombre}</Text>
-                <View style={styles.locationRow}>
-                  <Ionicons name="location" size={14} color={colors.greenPrimary} />
-                  <Text style={styles.locationText} numberOfLines={1}>
-                    {cancha.sedeName} — {cancha.sedeAddress}
+            return (
+              <View key={sede.id} style={styles.sedeSection}>
+                {/* Sede Section Header */}
+                <View style={styles.sedeSectionHeader}>
+                  <View style={styles.sedeIconBox}>
+                    <Ionicons name="location" size={16} color={colors.greenPrimary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.sedeSectionTitle}>{sede.nombre}</Text>
+                    <Text style={styles.sedeSectionAddress} numberOfLines={1}>{sede.direccion}</Text>
+                  </View>
+                  <Text style={styles.sedeCanchaCount}>
+                    {canchasDeSede.length} {canchasDeSede.length === 1 ? 'cancha' : 'canchas'}
                   </Text>
                 </View>
 
-                <View style={styles.tagsRow}>
-                  <View style={styles.tag}>
-                    <Text style={styles.tagText}>
-                      {SUPERFICIE_LABEL[cancha.tipo_superficie] || cancha.tipo_superficie}
-                    </Text>
-                  </View>
-                  <View style={styles.tag}>
-                    <Text style={styles.tagText}>{cancha.capacidad}</Text>
-                  </View>
-                  <View style={styles.priceTag}>
-                    <Text style={styles.priceText}>S/{cancha.precio_hora}/hr</Text>
-                  </View>
-                </View>
-
-                <View style={styles.featuresRow}>
-                  {cancha.tiene_iluminacion && (
-                    <View style={styles.feature}>
-                      <Ionicons name="bulb" size={14} color="#F59E0B" />
-                      <Text style={styles.featureText}>Iluminación</Text>
-                    </View>
-                  )}
-                  {cancha.tiene_vestuarios && (
-                    <View style={styles.feature}>
-                      <Ionicons name="shirt" size={14} color="#3B82F6" />
-                      <Text style={styles.featureText}>Vestuarios</Text>
-                    </View>
-                  )}
-                  {cancha.tiene_estacionamiento && (
-                    <View style={styles.feature}>
-                      <Ionicons name="car" size={14} color="#6B7280" />
-                      <Text style={styles.featureText}>Parking</Text>
-                    </View>
-                  )}
-                </View>
-
-                {/* Partido Stats */}
-                {(canchaStats[cancha.id]?.abiertos > 0 || canchaStats[cancha.id]?.llenos > 0) && (
-                  <View style={styles.partidoStatsRow}>
-                    {canchaStats[cancha.id]?.abiertos > 0 && (
-                      <View style={styles.statChip}>
-                        <View style={[styles.statDot, { backgroundColor: colors.greenPrimary }]} />
-                        <Text style={styles.statChipText}>
-                          {canchaStats[cancha.id].abiertos} {canchaStats[cancha.id].abiertos === 1 ? 'partido abierto' : 'partidos abiertos'}
+                {/* Cancha Cards */}
+                {canchasDeSede.map((cancha, index) => (
+                  <View key={cancha.id} style={styles.canchaCard}>
+                    {/* Card Top: Image + Info side by side */}
+                    <View style={styles.canchaCardTop}>
+                      <Image
+                        source={{ uri: cancha.foto_url || CANCHA_IMAGES[index % CANCHA_IMAGES.length] }}
+                        style={styles.canchaImage}
+                      />
+                      {/* Status badge on image */}
+                      <View style={[
+                        styles.statusBadge,
+                        cancha.aprobado ? styles.statusApproved : styles.statusPending,
+                      ]}>
+                        <View style={[
+                          styles.statusDot,
+                          { backgroundColor: cancha.aprobado ? colors.greenPrimary : '#F59E0B' },
+                        ]} />
+                        <Text style={[
+                          styles.statusText,
+                          { color: cancha.aprobado ? colors.greenPrimary : '#F59E0B' },
+                        ]}>
+                          {cancha.aprobado ? 'Activa' : 'Pendiente'}
                         </Text>
                       </View>
-                    )}
-                    {canchaStats[cancha.id]?.llenos > 0 && (
-                      <View style={[styles.statChip, styles.statChipLleno]}>
-                        <View style={[styles.statDot, { backgroundColor: '#D97706' }]} />
-                        <Text style={[styles.statChipText, { color: '#D97706' }]}>
-                          {canchaStats[cancha.id].llenos} {canchaStats[cancha.id].llenos === 1 ? 'lleno' : 'llenos'}
-                        </Text>
+
+                      <View style={styles.canchaInfo}>
+                        {/* Edit/Delete icons in top-right */}
+                        <View style={styles.cardActions}>
+                          <TouchableOpacity
+                            style={styles.cardActionBtn}
+                            onPress={() => openEditModal(cancha)}
+                          >
+                            <Ionicons name="create-outline" size={16} color={colors.gray500} />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.cardActionBtn}
+                            onPress={() => handleDeleteCancha(cancha.id, cancha.nombre)}
+                          >
+                            <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                          </TouchableOpacity>
+                        </View>
+
+                        <Text style={styles.canchaName}>{cancha.nombre}</Text>
+
+                        {/* Tags row */}
+                        <View style={styles.tagsRow}>
+                          <View style={styles.tag}>
+                            <Text style={styles.tagText}>
+                              {SUPERFICIE_LABEL[cancha.tipo_superficie] || cancha.tipo_superficie}
+                            </Text>
+                          </View>
+                          <View style={styles.tag}>
+                            <Text style={styles.tagText}>{cancha.capacidad}</Text>
+                          </View>
+                        </View>
+
+                        {/* Price */}
+                        <View style={styles.priceRow}>
+                          <Text style={styles.priceAmount}>S/{cancha.precio_hora}</Text>
+                          <Text style={styles.priceUnit}>/hora</Text>
+                        </View>
+
+                        {/* Service icons only */}
+                        <View style={styles.servicesRow}>
+                          {cancha.tiene_iluminacion && (
+                            <View style={[styles.serviceIcon, { backgroundColor: '#FEF3C7' }]}>
+                              <Ionicons name="bulb" size={14} color="#F59E0B" />
+                            </View>
+                          )}
+                          {cancha.tiene_vestuarios && (
+                            <View style={[styles.serviceIcon, { backgroundColor: '#DBEAFE' }]}>
+                              <Ionicons name="shirt" size={14} color="#3B82F6" />
+                            </View>
+                          )}
+                          {cancha.tiene_estacionamiento && (
+                            <View style={[styles.serviceIcon, { backgroundColor: '#F3F4F6' }]}>
+                              <Ionicons name="car" size={14} color="#6B7280" />
+                            </View>
+                          )}
+                        </View>
                       </View>
-                    )}
+                    </View>
+
+                    {/* Horizontal Action Buttons */}
+                    <View style={styles.cardButtonsRow}>
+                      <TouchableOpacity
+                        style={styles.horariosBtn}
+                        onPress={() =>
+                          router.push(
+                            `/(owner)/horarios/${cancha.id}?nombre=${encodeURIComponent(cancha.nombre)}`
+                          )
+                        }
+                      >
+                        <Ionicons name="time-outline" size={16} color={colors.white} />
+                        <Text style={styles.horariosBtnText}>Horarios</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.reservasBtn}
+                        onPress={() =>
+                          router.push(
+                            `/(owner)/reservas/${cancha.id}?nombre=${encodeURIComponent(cancha.nombre)}`
+                          )
+                        }
+                      >
+                        <Ionicons name="calendar-outline" size={16} color="#2563EB" />
+                        <Text style={styles.reservasBtnText}>Reservas</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                )}
-
-                <TouchableOpacity
-                  style={styles.horariosBtn}
-                  onPress={() =>
-                    router.push(
-                      `/(owner)/horarios/${cancha.id}?nombre=${encodeURIComponent(cancha.nombre)}`
-                    )
-                  }
-                >
-                  <Ionicons name="time-outline" size={18} color={colors.white} />
-                  <Text style={styles.horariosBtnText}>Gestionar Horarios</Text>
-                  <Ionicons name="chevron-forward" size={18} color={colors.white} />
-                </TouchableOpacity>
-
-                <View style={styles.actionRow}>
-                  <TouchableOpacity
-                    style={styles.editBtn}
-                    onPress={() => openEditModal(cancha)}
-                  >
-                    <Ionicons name="create-outline" size={18} color={colors.greenPrimary} />
-                    <Text style={styles.editBtnText}>Editar</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.deleteBtn}
-                    onPress={() => handleDeleteCancha(cancha.id, cancha.nombre)}
-                  >
-                    <Ionicons name="trash-outline" size={18} color="#EF4444" />
-                    <Text style={styles.deleteBtnText}>Eliminar</Text>
-                  </TouchableOpacity>
-                </View>
+                ))}
               </View>
-            </View>
-          ))
+            );
+          })
         )}
 
         <View style={{ height: 100 }} />
@@ -1057,53 +1109,122 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F5F7FA',
   },
-  // Header
+  // Premium Gradient Header
   header: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    backgroundColor: colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray100,
+    marginBottom: 20,
   },
-  headerLeft: {
-    flex: 1,
+  headerUserRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
-  greeting: {
-    fontSize: 22,
+  avatarCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    fontSize: 20,
     fontWeight: '800',
-    color: colors.gray900,
+    color: colors.white,
   },
-  subtitle: {
-    fontSize: 14,
-    color: colors.gray400,
+  headerUserInfo: {},
+  headerGreeting: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: colors.white,
+  },
+  headerRole: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.6)',
     marginTop: 2,
   },
   logoutBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.gray50,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.1)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.gray200,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 8,
+  },
+  statBox: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statNumber: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: colors.white,
+  },
+  statLabel: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.6)',
+    marginTop: 2,
+    fontWeight: '600',
+  },
+  statDivider: {
+    width: 1,
+    backgroundColor: 'rgba(255,255,255,0.15)',
   },
   // Content
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    padding: 20,
+    padding: 16,
   },
-  sectionTitle: {
-    fontSize: 18,
+  // Sede Sections
+  sedeSection: {
+    marginBottom: 8,
+  },
+  sedeSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
+  sedeIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: colors.greenLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sedeSectionTitle: {
+    fontSize: 16,
     fontWeight: '700',
     color: colors.gray900,
-    marginBottom: 16,
-    textAlign: 'center',
+  },
+  sedeSectionAddress: {
+    fontSize: 12,
+    color: colors.gray500,
+    marginTop: 1,
+  },
+  sedeCanchaCount: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.gray400,
   },
   // Empty State
   emptyState: {
@@ -1150,33 +1271,36 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.white,
   },
-  // Cancha Card
+  // Cancha Card - Compact
   canchaCard: {
     backgroundColor: colors.white,
-    borderRadius: 18,
-    marginBottom: 16,
+    borderRadius: 16,
+    marginBottom: 12,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
+    shadowOpacity: 0.05,
     shadowRadius: 8,
-    elevation: 3,
+    elevation: 2,
+  },
+  canchaCardTop: {
+    flexDirection: 'row',
   },
   canchaImage: {
-    width: '100%',
-    height: 160,
+    width: 120,
+    height: 140,
     backgroundColor: colors.gray100,
   },
   statusBadge: {
     position: 'absolute',
-    top: 12,
-    right: 12,
+    top: 8,
+    left: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 20,
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
   },
   statusApproved: {
     backgroundColor: 'rgba(240, 253, 244, 0.95)',
@@ -1185,123 +1309,123 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(254, 243, 199, 0.95)',
   },
   statusDot: {
-    width: 6,
-    height: 6,
+    width: 5,
+    height: 5,
     borderRadius: 3,
   },
   statusText: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '700',
   },
   canchaInfo: {
-    padding: 16,
+    flex: 1,
+    padding: 12,
+    justifyContent: 'center',
+  },
+  cardActions: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    flexDirection: 'row',
+    gap: 4,
+  },
+  cardActionBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.gray50,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   canchaName: {
-    fontSize: 20,
+    fontSize: 17,
     fontWeight: '800',
     color: colors.gray900,
     marginBottom: 6,
-  },
-  locationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginBottom: 12,
-  },
-  locationText: {
-    fontSize: 13,
-    color: colors.gray500,
-    flex: 1,
+    paddingRight: 60,
   },
   tagsRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 10,
+    gap: 6,
+    marginBottom: 8,
   },
   tag: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
     backgroundColor: colors.gray50,
     borderWidth: 1,
     borderColor: colors.gray200,
   },
   tagText: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '600',
     color: colors.gray700,
   },
-  priceTag: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-    backgroundColor: colors.greenLight,
-    borderWidth: 1,
-    borderColor: colors.greenBorder,
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginBottom: 8,
   },
-  priceText: {
-    fontSize: 12,
-    fontWeight: '700',
+  priceAmount: {
+    fontSize: 18,
+    fontWeight: '800',
     color: colors.greenPrimary,
   },
-  featuresRow: {
-    flexDirection: 'row',
-    gap: 14,
-    marginBottom: 14,
-  },
-  feature: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  featureText: {
+  priceUnit: {
     fontSize: 12,
-    color: colors.gray500,
+    color: colors.gray400,
+    marginLeft: 2,
   },
-  partidoStatsRow: {
+  servicesRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  serviceIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // Card Action Buttons (horizontal)
+  cardButtonsRow: {
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 12,
-  },
-  statChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-    backgroundColor: colors.greenLight,
-    borderWidth: 1,
-    borderColor: colors.greenBorder,
-  },
-  statChipLleno: {
-    backgroundColor: '#FEF3C7',
-    borderColor: '#FDE68A',
-  },
-  statDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  statChipText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.greenPrimary,
+    padding: 10,
+    paddingTop: 0,
   },
   horariosBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
     backgroundColor: colors.greenPrimary,
-    borderRadius: 12,
-    paddingVertical: 14,
+    borderRadius: 10,
+    paddingVertical: 10,
   },
   horariosBtnText: {
-    flex: 1,
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '700',
     color: colors.white,
+  },
+  reservasBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#EBF5FF',
+    borderRadius: 10,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  reservasBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#2563EB',
   },
   // FAB
   fab: {
@@ -1508,46 +1632,6 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700',
     color: colors.white,
-  },
-  // Action buttons
-  actionRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 12,
-  },
-  editBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: colors.greenLight,
-    borderWidth: 1,
-    borderColor: colors.greenBorder,
-  },
-  editBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.greenPrimary,
-  },
-  deleteBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: '#FEF2F2',
-    borderWidth: 1,
-    borderColor: '#FECACA',
-  },
-  deleteBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#EF4444',
   },
   // Foto picker
   fotoPickerBtn: {

@@ -322,6 +322,19 @@ export const partidosService = {
     return (data as unknown as PartidoConDetalles[]) || [];
   },
 
+  // Obtener horarios reservados/ocupados para una cancha en una fecha
+  async getHorariosOcupados(canchaId: string, fecha: string): Promise<string[]> {
+    const { data, error } = await supabase
+      .from('partidos')
+      .select('hora_inicio')
+      .eq('cancha_id', canchaId)
+      .eq('fecha', fecha)
+      .in('estado', ['abierto', 'lleno', 'en_curso', 'reservado']);
+
+    if (error) throw error;
+    return (data || []).map((p) => p.hora_inicio.substring(0, 5));
+  },
+
   // Crear una reserva de cancha (modelo 50% adelanto)
   async crearReserva(input: CrearReservaInput): Promise<Partido> {
     const maxJugadores = input.formato === '5v5' ? 10 : 12;
@@ -368,6 +381,27 @@ export const partidosService = {
       .eq('id', jugadorId);
 
     if (error) throw error;
+  },
+
+  // Obtener reservas de una cancha (para el dueño)
+  async getReservasPorCancha(canchaId: string): Promise<any[]> {
+    const { data, error } = await supabase
+      .from('partidos')
+      .select(`
+        *,
+        cancha:canchas(*),
+        creador:perfiles!creador_id(
+          id, nombre_completo, telefono, avatar_url
+        )
+      `)
+      .eq('cancha_id', canchaId)
+      .eq('tipo', 'reserva')
+      .neq('estado', 'cancelado')
+      .order('fecha', { ascending: true })
+      .order('hora_inicio', { ascending: true });
+
+    if (error) throw error;
+    return data || [];
   },
 
   // Obtener mis reservas

@@ -45,6 +45,7 @@ export default function CanchaDetailScreen() {
   const [selectedFormato, setSelectedFormato] = useState<'5v5' | '6v6'>('5v5');
   const [cancha, setCancha] = useState<CanchaConSede | null>(null);
   const [horarios, setHorarios] = useState<Horario[]>([]);
+  const [horariosOcupados, setHorariosOcupados] = useState<string[]>([]);
   const [loadingCancha, setLoadingCancha] = useState(true);
   const [bookingLoading, setBookingLoading] = useState(false);
   const [modalStep, setModalStep] = useState<ModalStep>(null);
@@ -73,18 +74,36 @@ export default function CanchaDetailScreen() {
     fetchData();
   }, [id]);
 
+  // Cargar horarios ocupados cuando cambia la fecha
+  useEffect(() => {
+    if (!id || !selectedDate) return;
+    const fetchOcupados = async () => {
+      try {
+        const ocupados = await partidosService.getHorariosOcupados(id, selectedDate);
+        setHorariosOcupados(ocupados);
+      } catch (err) {
+        console.error('Error fetching horarios ocupados:', err);
+      }
+    };
+    fetchOcupados();
+  }, [id, selectedDate]);
+
   // Convert horarios to TimeSlot[] based on selected date's day of week
   const slots: TimeSlot[] = useMemo(() => {
     const dayOfWeek = new Date(selectedDate + 'T12:00:00').getDay();
     const dayHorarios = horarios.filter((h) => h.dia_semana === dayOfWeek);
     return dayHorarios
-      .map((h) => ({
-        hora: h.hora_inicio.substring(0, 5),
-        precio: cancha?.precio_hora || 0,
-        estado: 'disponible' as const,
-      }))
+      .map((h) => {
+        const hora = h.hora_inicio.substring(0, 5);
+        const ocupado = horariosOcupados.includes(hora);
+        return {
+          hora,
+          precio: cancha?.precio_hora || 0,
+          estado: ocupado ? 'ocupado' as const : 'disponible' as const,
+        };
+      })
       .sort((a, b) => a.hora.localeCompare(b.hora));
-  }, [selectedDate, horarios, cancha]);
+  }, [selectedDate, horarios, cancha, horariosOcupados]);
 
   // Reset selection when date changes
   useEffect(() => {
@@ -152,8 +171,10 @@ export default function CanchaDetailScreen() {
       // Descontar saldo del jugador
       await partidosService.descontarSaldo(jugador.id, totalAPagar);
 
-      // Refrescar datos del usuario
+      // Refrescar datos del usuario y horarios ocupados
       await refreshUserData();
+      const ocupados = await partidosService.getHorariosOcupados(cancha.id, selectedDate);
+      setHorariosOcupados(ocupados);
 
       // Guardar datos de confirmación
       setReservaConfirmada({

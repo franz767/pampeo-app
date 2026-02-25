@@ -33,6 +33,7 @@ export default function TimeSlotGrid({ slots, selectedSlot, onSlotSelect }: Time
             activeOpacity={0.7}
           >
             {isSelected && <Text style={styles.selectedLabel}>ELEGIDO</Text>}
+            {isBooked && <Text style={styles.bookedLabel}>RESERVADO</Text>}
             <Text
               style={[
                 styles.hora,
@@ -40,7 +41,7 @@ export default function TimeSlotGrid({ slots, selectedSlot, onSlotSelect }: Time
                 isSelected && styles.horaSelected,
               ]}
             >
-              {isBooked ? 'Ocupado' : slot.hora}
+              {slot.hora}
             </Text>
             <Text
               style={[
@@ -49,7 +50,7 @@ export default function TimeSlotGrid({ slots, selectedSlot, onSlotSelect }: Time
                 isSelected && styles.precioSelected,
               ]}
             >
-              {isBooked ? slot.hora : `S/${slot.precio}/hora`}
+              {isBooked ? 'No disponible' : `S/${slot.precio}/hora`}
             </Text>
           </TouchableOpacity>
         );
@@ -74,9 +75,15 @@ const styles = StyleSheet.create({
     borderColor: colors.gray200,
   },
   slotBooked: {
-    backgroundColor: colors.gray100,
-    borderColor: colors.gray200,
-    opacity: 0.6,
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+    opacity: 0.8,
+  },
+  bookedLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#EF4444',
+    marginBottom: 4,
   },
   slotSelected: {
     backgroundColor: colors.greenLight,

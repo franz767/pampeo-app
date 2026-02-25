@@ -5,6 +5,7 @@ export default function OwnerLayout() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="dashboard" />
       <Stack.Screen name="horarios/[canchaId]" />
+      <Stack.Screen name="reservas/[canchaId]" />
     </Stack>
   );
 }

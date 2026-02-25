@@ -1,5 +1,7 @@
 import { View, Text, StyleSheet, TouchableOpacity, ImageBackground } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+// @ts-ignore
+import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme';
 
 interface RoleCardProps {
@@ -8,6 +10,7 @@ interface RoleCardProps {
   imageSource: any;
   selected: boolean;
   onPress: () => void;
+  icon?: string;
 }
 
 export default function RoleCard({
@@ -16,6 +19,7 @@ export default function RoleCard({
   imageSource,
   selected,
   onPress,
+  icon,
 }: RoleCardProps) {
   return (
     <TouchableOpacity
@@ -30,28 +34,44 @@ export default function RoleCard({
         resizeMode="cover"
       >
         <LinearGradient
-          colors={['transparent', 'rgba(0,0,0,0.8)']}
+          colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.85)']}
           style={styles.gradient}
         >
+          {/* Selected checkmark */}
+          {selected && (
+            <View style={styles.checkBadge}>
+              <Ionicons name="checkmark" size={16} color={colors.white} />
+            </View>
+          )}
+
           <View style={styles.content}>
+            {icon && (
+              <View style={styles.iconBox}>
+                <Ionicons name={icon as any} size={22} color={colors.white} />
+              </View>
+            )}
             <Text style={styles.title}>{title}</Text>
             <Text style={styles.description}>{description}</Text>
           </View>
         </LinearGradient>
       </ImageBackground>
-      {selected && <View style={styles.selectedBorder} />}
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    height: 180,
-    borderRadius: 16,
+    height: 190,
+    borderRadius: 20,
     overflow: 'hidden',
-    marginBottom: 16,
-    borderWidth: 2,
+    marginBottom: 14,
+    borderWidth: 3,
     borderColor: 'transparent',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 5,
   },
   containerSelected: {
     borderColor: colors.greenPrimary,
@@ -60,34 +80,50 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   imageStyle: {
-    borderRadius: 14,
+    borderRadius: 17,
   },
   gradient: {
     flex: 1,
     justifyContent: 'flex-end',
-    padding: 20,
+    padding: 22,
+  },
+  checkBadge: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.greenPrimary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
   content: {
     gap: 6,
   },
+  iconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   title: {
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: 22,
+    fontWeight: '800',
     color: colors.white,
+    letterSpacing: -0.3,
   },
   description: {
     fontSize: 13,
-    color: 'rgba(255,255,255,0.8)',
+    color: 'rgba(255,255,255,0.75)',
     lineHeight: 18,
-  },
-  selectedBorder: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: colors.greenPrimary,
   },
 });

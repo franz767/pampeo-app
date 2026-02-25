@@ -11,29 +11,30 @@ export default function TabsLayout() {
 
   return (
     <View style={{ flex: 1 }}>
-      {/* Saldo chip - esquina superior derecha */}
-      <View style={styles.saldoContainer}>
-        <View style={styles.saldoChip}>
-          <Ionicons name="wallet-outline" size={14} color={colors.greenPrimary} />
-          <Text style={styles.saldoText}>S/{saldo.toFixed(2)}</Text>
-        </View>
-      </View>
-
       <Tabs
         screenOptions={{
           tabBarActiveTintColor: colors.greenPrimary,
           tabBarInactiveTintColor: colors.gray400,
           tabBarStyle: {
             backgroundColor: colors.white,
-            borderTopWidth: 1,
-            borderTopColor: colors.gray200,
-            height: Platform.OS === 'ios' ? 85 : 70,
-            paddingBottom: Platform.OS === 'ios' ? 25 : 10,
-            paddingTop: 10,
+            borderTopWidth: 0,
+            height: Platform.OS === 'ios' ? 88 : 70,
+            paddingBottom: Platform.OS === 'ios' ? 28 : 10,
+            paddingTop: 8,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: -4 },
+            shadowOpacity: 0.06,
+            shadowRadius: 12,
+            elevation: 8,
           },
-          tabBarShowLabel: false,
+          tabBarShowLabel: true,
+          tabBarLabelStyle: {
+            fontSize: 11,
+            fontWeight: '600',
+            marginTop: 2,
+          },
           tabBarIconStyle: {
-            marginBottom: -4,
+            marginBottom: -2,
           },
           headerShown: false,
         }}
@@ -41,88 +42,57 @@ export default function TabsLayout() {
         <Tabs.Screen
           name="index"
           options={{
-            tabBarIcon: ({ color }) => (
-              <Ionicons name="home-outline" size={24} color={color} />
+            title: 'Inicio',
+            tabBarIcon: ({ color, focused }) => (
+              <View style={focused ? styles.activeIconBox : undefined}>
+                <Ionicons name={focused ? 'home' : 'home-outline'} size={22} color={color} />
+              </View>
             ),
           }}
         />
         <Tabs.Screen
           name="partidos"
           options={{
-            tabBarIcon: ({ color }) => (
-              <Ionicons name="football-outline" size={24} color={color} />
+            title: 'Partidos',
+            tabBarIcon: ({ color, focused }) => (
+              <View style={focused ? styles.activeIconBox : undefined}>
+                <Ionicons name={focused ? 'football' : 'football-outline'} size={22} color={color} />
+              </View>
             ),
           }}
         />
         <Tabs.Screen
           name="mis-partidos"
           options={{
-            tabBarIcon: ({ color }) => (
-              <Ionicons name="people-outline" size={24} color={color} />
+            title: 'Reservas',
+            tabBarIcon: ({ color, focused }) => (
+              <View style={focused ? styles.activeIconBox : undefined}>
+                <Ionicons name={focused ? 'calendar' : 'calendar-outline'} size={22} color={color} />
+              </View>
             ),
           }}
         />
         <Tabs.Screen
           name="perfil"
           options={{
-            tabBarIcon: ({ color }) => (
-              <Ionicons name="person-outline" size={24} color={color} />
+            title: 'Perfil',
+            tabBarIcon: ({ color, focused }) => (
+              <View style={focused ? styles.activeIconBox : undefined}>
+                <Ionicons name={focused ? 'person' : 'person-outline'} size={22} color={color} />
+              </View>
             ),
           }}
         />
       </Tabs>
-
-      {/* Centered FAB */}
-      <TouchableOpacity style={styles.fab} activeOpacity={0.8}>
-        <Ionicons name="add" size={30} color={colors.white} />
-      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  saldoContainer: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 54 : 34,
-    right: 16,
-    zIndex: 20,
-  },
-  saldoChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: colors.white,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 4,
-    borderWidth: 1,
-    borderColor: colors.greenBorder,
-  },
-  saldoText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.greenPrimary,
-  },
-  fab: {
-    position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 50 : 25,
-    alignSelf: 'center',
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.greenPrimary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 8,
-    zIndex: 10,
+  activeIconBox: {
+    backgroundColor: colors.greenLight,
+    borderRadius: 10,
+    padding: 6,
+    marginBottom: -4,
   },
 });

@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 // @ts-ignore
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -50,88 +51,111 @@ export default function PerfilScreen() {
   };
 
   const nivel = jugador?.nivel ? NIVEL_MAP[jugador.nivel] || jugador.nivel : 'AVANZADO';
+  const firstName = perfil?.nombre_completo?.split(' ')[0] || 'Jugador';
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerButton}>
-          <Ionicons name="chevron-back" size={24} color={colors.gray900} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Perfil</Text>
-        <TouchableOpacity onPress={handleSignOut} style={styles.headerButton}>
-          <Ionicons name="settings-outline" size={24} color={colors.gray900} />
-        </TouchableOpacity>
-      </View>
-
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Avatar */}
-        <View style={styles.avatarSection}>
-          <View style={styles.avatarWrapper}>
-            {perfil?.avatar_url ? (
-              <Image source={{ uri: perfil.avatar_url }} style={styles.avatarImage} />
-            ) : (
-              <View style={styles.avatarPlaceholder}>
-                <Ionicons name="person" size={48} color={colors.gray400} />
-              </View>
-            )}
-            <View style={styles.verifiedBadge}>
-              <Ionicons name="checkmark" size={14} color={colors.white} />
-            </View>
-          </View>
-          <Text style={styles.name}>{perfil?.nombre_completo || 'Jugador'}</Text>
-          <View style={styles.levelBadge}>
-            <Ionicons name="diamond" size={14} color={colors.greenPrimary} />
-            <Text style={styles.levelText}>{nivel}</Text>
-          </View>
-        </View>
-
-        {/* Billetera Card */}
-        <View style={styles.walletCard}>
-          <View style={styles.walletHeader}>
-            <View style={styles.walletIcon}>
-              <Ionicons name="wallet" size={20} color={colors.greenPrimary} />
-            </View>
-            <Text style={styles.walletLabel}>Mi Billetera</Text>
-          </View>
-          <Text style={styles.walletAmount}>S/{(jugador?.saldo || 0).toFixed(2)}</Text>
-          <TouchableOpacity style={styles.walletBtn} disabled>
-            <Ionicons name="add-circle-outline" size={16} color={colors.gray400} />
-            <Text style={styles.walletBtnText}>Recargar (Próximamente)</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Stats Card */}
-        <View style={styles.statsCard}>
-          <View style={styles.statsRow}>
-            <StatCircle value={jugador?.goles || 42} label="GOLES" />
-            <StatCircle value={jugador?.partidos_ganados || 18} label="GANADOS" />
-            <StatCircle value={0} label="MVPS" icon="🏆" />
-          </View>
-        </View>
-
-        {/* Player DNA */}
-        <PlayerDNA
-          posicion={jugador?.posicion || 'delantero'}
-          zonaPreferida={jugador?.zona_preferida || 'Diestro'}
-          onEdit={() => {}}
-        />
-
-        {/* Last Matches */}
-        <View style={styles.matchesSection}>
-          <View style={styles.matchesHeader}>
-            <Text style={styles.matchesTitle}>Últimos Partidos</Text>
-            <TouchableOpacity>
-              <Text style={styles.seeAll}>Ver Todo</Text>
+        {/* Gradient Header with Avatar */}
+        <LinearGradient
+          colors={['#0F2A14', '#1A3A1F', '#22C55E']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.headerGradient, { paddingTop: insets.top + 12 }]}
+        >
+          {/* Top bar */}
+          <View style={styles.headerTopBar}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.headerIconBtn}>
+              <Ionicons name="chevron-back" size={22} color="rgba(255,255,255,0.8)" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Mi Perfil</Text>
+            <TouchableOpacity onPress={handleSignOut} style={styles.headerIconBtn}>
+              <Ionicons name="log-out-outline" size={22} color="rgba(255,255,255,0.8)" />
             </TouchableOpacity>
           </View>
-          {SAMPLE_MATCHES.map((match, index) => (
-            <MatchHistoryCard key={index} {...match} />
-          ))}
+
+          {/* Avatar + Name */}
+          <View style={styles.avatarSection}>
+            <View style={styles.avatarWrapper}>
+              {perfil?.avatar_url ? (
+                <Image source={{ uri: perfil.avatar_url }} style={styles.avatarImage} />
+              ) : (
+                <View style={styles.avatarPlaceholder}>
+                  <Ionicons name="person" size={40} color="rgba(255,255,255,0.5)" />
+                </View>
+              )}
+              <View style={styles.verifiedBadge}>
+                <Ionicons name="checkmark" size={12} color={colors.white} />
+              </View>
+            </View>
+            <Text style={styles.name}>{perfil?.nombre_completo || 'Jugador'}</Text>
+            <View style={styles.levelBadge}>
+              <Ionicons name="diamond" size={12} color="#FCD34D" />
+              <Text style={styles.levelText}>{nivel}</Text>
+            </View>
+          </View>
+
+          {/* Quick Stats Row */}
+          <View style={styles.quickStatsRow}>
+            <View style={styles.quickStat}>
+              <Text style={styles.quickStatNumber}>{jugador?.goles || 0}</Text>
+              <Text style={styles.quickStatLabel}>Goles</Text>
+            </View>
+            <View style={styles.quickStatDivider} />
+            <View style={styles.quickStat}>
+              <Text style={styles.quickStatNumber}>{jugador?.partidos_ganados || 0}</Text>
+              <Text style={styles.quickStatLabel}>Ganados</Text>
+            </View>
+            <View style={styles.quickStatDivider} />
+            <View style={styles.quickStat}>
+              <Text style={styles.quickStatNumber}>0</Text>
+              <Text style={styles.quickStatLabel}>MVPs</Text>
+            </View>
+          </View>
+        </LinearGradient>
+
+        {/* Content */}
+        <View style={styles.content}>
+          {/* Billetera Card */}
+          <View style={styles.walletCard}>
+            <View style={styles.walletHeader}>
+              <View style={styles.walletIcon}>
+                <Ionicons name="wallet" size={20} color={colors.greenPrimary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.walletLabel}>Mi Billetera</Text>
+                <Text style={styles.walletAmount}>S/{(jugador?.saldo || 0).toFixed(2)}</Text>
+              </View>
+              <TouchableOpacity style={styles.walletBtn} disabled>
+                <Ionicons name="add-circle-outline" size={18} color={colors.gray400} />
+                <Text style={styles.walletBtnText}>Recargar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Player DNA */}
+          <PlayerDNA
+            posicion={jugador?.posicion || 'delantero'}
+            zonaPreferida={jugador?.zona_preferida || 'Diestro'}
+            onEdit={() => {}}
+          />
+
+          {/* Last Matches */}
+          <View style={styles.matchesSection}>
+            <View style={styles.matchesHeader}>
+              <Text style={styles.matchesTitle}>Últimos Partidos</Text>
+              <TouchableOpacity>
+                <Text style={styles.seeAll}>Ver Todo</Text>
+              </TouchableOpacity>
+            </View>
+            {SAMPLE_MATCHES.map((match, index) => (
+              <MatchHistoryCard key={index} {...match} />
+            ))}
+          </View>
         </View>
 
         <View style={{ height: 100 }} />
@@ -143,27 +167,7 @@ export default function PerfilScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.gray50,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 12,
-    backgroundColor: colors.white,
-  },
-  headerButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: colors.gray900,
+    backgroundColor: '#F5F7FA',
   },
   scrollView: {
     flex: 1,
@@ -171,143 +175,174 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 40,
   },
+  // Gradient Header
+  headerGradient: {
+    paddingBottom: 24,
+  },
+  headerTopBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    marginBottom: 20,
+  },
+  headerIconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.white,
+  },
   // Avatar
   avatarSection: {
     alignItems: 'center',
-    paddingVertical: 24,
-    backgroundColor: colors.white,
-    paddingHorizontal: 20,
+    marginBottom: 20,
   },
   avatarWrapper: {
     position: 'relative',
     marginBottom: 12,
   },
   avatarImage: {
-    width: 110,
-    height: 110,
-    borderRadius: 55,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
     borderWidth: 3,
-    borderColor: colors.greenBorder,
+    borderColor: 'rgba(255,255,255,0.3)',
   },
   avatarPlaceholder: {
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-    backgroundColor: colors.gray100,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: 'rgba(255,255,255,0.15)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
-    borderColor: colors.greenBorder,
+    borderColor: 'rgba(255,255,255,0.3)',
   },
   verifiedBadge: {
     position: 'absolute',
-    bottom: 4,
-    right: 4,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    bottom: 2,
+    right: 2,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: colors.greenPrimary,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 3,
-    borderColor: colors.white,
+    borderWidth: 2,
+    borderColor: '#1A3A1F',
   },
   name: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '800',
-    color: colors.gray900,
+    color: colors.white,
     marginBottom: 8,
   },
   levelBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: colors.greenLight,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: colors.greenBorder,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
   },
   levelText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
-    color: colors.greenPrimary,
-    letterSpacing: 0.5,
+    color: 'rgba(255,255,255,0.9)',
+    letterSpacing: 1,
   },
-  // Wallet
+  // Quick stats in header
+  quickStatsRow: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    borderRadius: 16,
+    marginHorizontal: 20,
+    paddingVertical: 16,
+    paddingHorizontal: 8,
+  },
+  quickStat: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  quickStatNumber: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: colors.white,
+  },
+  quickStatLabel: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.6)',
+    marginTop: 2,
+    fontWeight: '600',
+  },
+  quickStatDivider: {
+    width: 1,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  // Content
+  content: {
+    paddingHorizontal: 16,
+    marginTop: -1,
+  },
+  // Wallet - redesigned as compact horizontal card
   walletCard: {
     backgroundColor: colors.white,
-    marginHorizontal: 20,
-    marginTop: 20,
+    marginTop: 16,
     borderRadius: 16,
-    padding: 18,
+    padding: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
+    shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
   },
   walletHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
+    gap: 12,
   },
   walletIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 42,
+    height: 42,
+    borderRadius: 14,
     backgroundColor: colors.greenLight,
     justifyContent: 'center',
     alignItems: 'center',
   },
   walletLabel: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
-    color: colors.gray500,
+    color: colors.gray400,
   },
   walletAmount: {
-    fontSize: 32,
+    fontSize: 24,
     fontWeight: '800',
     color: colors.gray900,
-    marginBottom: 12,
   },
   walletBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
+    gap: 4,
     backgroundColor: colors.gray100,
-    paddingVertical: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
     borderRadius: 10,
   },
   walletBtnText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
     color: colors.gray400,
   },
-  // Stats
-  statsCard: {
-    backgroundColor: colors.white,
-    marginHorizontal: 20,
-    marginTop: 20,
-    borderRadius: 16,
-    paddingVertical: 24,
-    paddingHorizontal: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
   // Matches
   matchesSection: {
-    paddingHorizontal: 20,
     marginBottom: 24,
   },
   matchesHeader: {
@@ -324,6 +359,6 @@ const styles = StyleSheet.create({
   seeAll: {
     fontSize: 14,
     fontWeight: '600',
-    color: colors.gray400,
+    color: colors.greenPrimary,
   },
 });

@@ -145,11 +145,162 @@ export default function PartidoDetailScreen() {
   }
 
   const estado = estadoConfig[partido.estado] || estadoConfig.abierto;
+  const esReserva = partido.tipo === 'reserva';
+  const precioCancha = partido.cancha?.precio_hora || 0;
+  const adelanto = precioCancha / 2;
+  const restante = precioCancha - adelanto;
   const progreso = partido.max_jugadores > 0
     ? partido.jugadores_confirmados / partido.max_jugadores
     : 0;
   const slotsVacios = partido.max_jugadores - jugadoresConfirmados.length;
 
+  // Vista de Reserva (modelo 1 - tipo Airbnb)
+  if (esReserva) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.headerBtn} onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={22} color={colors.gray900} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Detalle de Reserva</Text>
+          <View style={styles.headerRight}>
+            <View style={styles.saldoChip}>
+              <Ionicons name="wallet-outline" size={14} color={colors.greenPrimary} />
+              <Text style={styles.saldoChipText}>S/{(jugador?.saldo || 0).toFixed(2)}</Text>
+            </View>
+          </View>
+        </View>
+
+        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+          {/* Info Card */}
+          <View style={styles.infoCard}>
+            <View style={styles.infoHeader}>
+              <View style={styles.infoLeft}>
+                <Text style={styles.sedeName}>{partido.cancha?.sede?.nombre}</Text>
+                <Text style={styles.canchaName}>{partido.cancha?.nombre}</Text>
+              </View>
+              <View style={[styles.estadoBadge, { backgroundColor: '#FEF3C7' }]}>
+                <Text style={[styles.estadoText, { color: '#D97706' }]}>Reservado</Text>
+              </View>
+            </View>
+
+            <View style={styles.infoDetails}>
+              <View style={styles.infoItem}>
+                <Ionicons name="calendar" size={16} color={colors.greenPrimary} />
+                <Text style={styles.infoText}>{formatFechaLarga(partido.fecha)}</Text>
+              </View>
+              <View style={styles.infoItem}>
+                <Ionicons name="time" size={16} color={colors.greenPrimary} />
+                <Text style={styles.infoText}>
+                  {formatHora(partido.hora_inicio)} - {formatHora(partido.hora_fin)}
+                </Text>
+              </View>
+              <View style={styles.infoItem}>
+                <Ionicons name="location" size={16} color={colors.greenPrimary} />
+                <Text style={styles.infoText} numberOfLines={1}>
+                  {partido.cancha?.sede?.direccion}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Resumen de Pago */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Resumen de Pago</Text>
+            <View style={styles.reservaPagoBox}>
+              <View style={styles.reservaPagoLine}>
+                <Text style={styles.reservaPagoLabel}>Precio cancha (1 hora)</Text>
+                <Text style={styles.reservaPagoAmount}>S/{precioCancha.toFixed(2)}</Text>
+              </View>
+              <View style={styles.reservaPagoDivider} />
+              <View style={styles.reservaPagoLine}>
+                <View style={styles.reservaPagoLabelRow}>
+                  <Ionicons name="checkmark-circle" size={16} color={colors.greenPrimary} />
+                  <Text style={[styles.reservaPagoLabel, { color: colors.greenPrimary, fontWeight: '700' }]}>Adelanto pagado (50%)</Text>
+                </View>
+                <Text style={[styles.reservaPagoAmount, { color: colors.greenPrimary, fontWeight: '800' }]}>S/{adelanto.toFixed(2)}</Text>
+              </View>
+              <View style={styles.reservaPagoLine}>
+                <View style={styles.reservaPagoLabelRow}>
+                  <Ionicons name="time" size={16} color={colors.amber} />
+                  <Text style={[styles.reservaPagoLabel, { color: colors.amber, fontWeight: '700' }]}>Falta pagar al dueño</Text>
+                </View>
+                <Text style={[styles.reservaPagoAmount, { color: colors.amber, fontWeight: '800' }]}>S/{restante.toFixed(2)}</Text>
+              </View>
+            </View>
+            <View style={styles.reservaInfoBox}>
+              <Ionicons name="information-circle" size={16} color="#2563EB" />
+              <Text style={styles.reservaInfoText}>
+                Paga el restante al dueño directamente (efectivo, Yape, Plin)
+              </Text>
+            </View>
+          </View>
+
+          {/* Contacto del dueño */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Contacto del dueño</Text>
+            <View style={styles.reservaContactRow}>
+              <View style={styles.reservaContactAvatar}>
+                <Ionicons name="person" size={20} color={colors.greenPrimary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.reservaContactName}>
+                  {partido.cancha?.sede?.nombre}
+                </Text>
+                <Text style={styles.reservaContactPhone}>
+                  {partido.cancha?.sede?.telefono_contacto || 'Sin teléfono'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.reservaWhatsappBtn}
+                onPress={() => {
+                  const tel = partido.cancha?.sede?.telefono_contacto?.replace(/\s/g, '');
+                  const msg = `Hola! Reservé la cancha ${partido.cancha?.nombre} para el ${formatFechaLarga(partido.fecha)} a las ${formatHora(partido.hora_inicio)}. Reservé por Pampeo.`;
+                  Alert.alert('WhatsApp', `Contactar al ${tel}\n\n${msg}`);
+                }}
+              >
+                <Ionicons name="logo-whatsapp" size={20} color={colors.white} />
+                <Text style={styles.reservaWhatsappText}>WhatsApp</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={{ height: 100 }} />
+        </ScrollView>
+
+        {/* Footer - Cancelar reserva */}
+        {partido.estado !== 'cancelado' && (
+          <View style={styles.footer}>
+            <TouchableOpacity
+              style={styles.cancelBtn}
+              onPress={handleCancelar}
+              disabled={actionLoading}
+            >
+              {actionLoading ? (
+                <ActivityIndicator color={colors.red} />
+              ) : (
+                <>
+                  <Ionicons name="close-circle-outline" size={20} color={colors.red} />
+                  <Text style={styles.cancelBtnText}>Cancelar Reserva</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {partido.estado === 'cancelado' && (
+          <View style={styles.footer}>
+            <View style={styles.cancelledBanner}>
+              <Ionicons name="close-circle" size={20} color={colors.red} />
+              <Text style={styles.cancelledText}>Esta reserva fue cancelada</Text>
+            </View>
+          </View>
+        )}
+      </View>
+    );
+  }
+
+  // Vista de Partido (modelo 2 - Sala de Partido)
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -776,5 +927,90 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: colors.red,
+  },
+
+  // Reserva detail styles
+  reservaPagoBox: {
+    backgroundColor: colors.gray50,
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 12,
+    gap: 10,
+  },
+  reservaPagoLine: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  reservaPagoLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  reservaPagoLabel: {
+    fontSize: 14,
+    color: colors.gray600,
+  },
+  reservaPagoAmount: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.gray900,
+  },
+  reservaPagoDivider: {
+    height: 1,
+    backgroundColor: colors.gray200,
+    marginVertical: 4,
+  },
+  reservaInfoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#EBF5FF',
+    borderRadius: 10,
+    padding: 12,
+    marginTop: 12,
+  },
+  reservaInfoText: {
+    fontSize: 13,
+    color: '#1E40AF',
+    flex: 1,
+  },
+  reservaContactRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    gap: 12,
+  },
+  reservaContactAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.greenLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  reservaContactName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.gray900,
+  },
+  reservaContactPhone: {
+    fontSize: 13,
+    color: colors.gray500,
+    marginTop: 2,
+  },
+  reservaWhatsappBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#25D366',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  reservaWhatsappText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.white,
   },
 });

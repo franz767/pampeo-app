@@ -3,27 +3,43 @@ import {
   Text,
   StyleSheet,
   FlatList,
-  Platform,
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
 // @ts-ignore
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { usePartidosDisponibles } from '../../src/hooks/usePartido';
 import { PartidoCard } from '../../src/components/partido/PartidoCard';
 import { colors } from '../../src/theme';
 
 export default function PartidosScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { partidos, loading, refetch } = usePartidosDisponibles();
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Partidos Disponibles</Text>
-        <Text style={styles.headerSubtitle}>Únete a un partido cerca de ti</Text>
-      </View>
+      {/* Premium Header */}
+      <LinearGradient
+        colors={['#0F2A14', '#1A3A1F', '#22C55E']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.header, { paddingTop: insets.top + 16 }]}
+      >
+        <View style={styles.headerContent}>
+          <View>
+            <Text style={styles.headerTitle}>Partidos</Text>
+            <Text style={styles.headerSubtitle}>Únete a un partido cerca de ti</Text>
+          </View>
+          <View style={styles.headerBadge}>
+            <Ionicons name="football" size={16} color={colors.white} />
+            <Text style={styles.headerBadgeText}>{partidos.length}</Text>
+          </View>
+        </View>
+      </LinearGradient>
 
       {loading && partidos.length === 0 ? (
         <View style={styles.centered}>
@@ -31,7 +47,9 @@ export default function PartidosScreen() {
         </View>
       ) : partidos.length === 0 ? (
         <View style={styles.centered}>
-          <Ionicons name="football-outline" size={56} color={colors.gray200} />
+          <View style={styles.emptyIconBox}>
+            <Ionicons name="football-outline" size={48} color={colors.gray400} />
+          </View>
           <Text style={styles.emptyTitle}>No hay partidos disponibles</Text>
           <Text style={styles.emptySubtitle}>
             Sé el primero en crear uno desde una cancha
@@ -61,25 +79,40 @@ export default function PartidosScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.gray50,
+    backgroundColor: '#F5F7FA',
   },
   header: {
-    paddingTop: Platform.OS === 'ios' ? 60 : 44,
-    paddingBottom: 16,
+    paddingBottom: 20,
     paddingHorizontal: 20,
-    backgroundColor: colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray100,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: '800',
-    color: colors.gray900,
+    color: colors.white,
   },
   headerSubtitle: {
     fontSize: 14,
-    color: colors.gray500,
+    color: 'rgba(255,255,255,0.6)',
     marginTop: 4,
+  },
+  headerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 14,
+  },
+  headerBadgeText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: colors.white,
   },
   list: {
     padding: 16,
@@ -88,14 +121,21 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
     paddingHorizontal: 40,
+  },
+  emptyIconBox: {
+    width: 80,
+    height: 80,
+    borderRadius: 24,
+    backgroundColor: colors.gray100,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   emptyTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: colors.gray700,
-    marginTop: 8,
   },
   emptySubtitle: {
     fontSize: 14,
