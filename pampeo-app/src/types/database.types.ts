@@ -181,6 +181,12 @@ export interface Database {
           tipo_superficie: 'grass_natural' | 'grass_sintetico' | 'cemento';
           capacidad: '5v5' | '6v6' | '5v5_6v6';
           precio_hora: number;
+          precio_dia: number | null;
+          precio_noche: number | null;
+          horario_dia_inicio: string | null;
+          horario_dia_fin: string | null;
+          horario_noche_inicio: string | null;
+          horario_noche_fin: string | null;
           largo_metros: number | null;
           ancho_metros: number | null;
           tiene_iluminacion: boolean;
@@ -199,6 +205,12 @@ export interface Database {
           tipo_superficie: 'grass_natural' | 'grass_sintetico' | 'cemento';
           capacidad: '5v5' | '6v6' | '5v5_6v6';
           precio_hora: number;
+          precio_dia?: number | null;
+          precio_noche?: number | null;
+          horario_dia_inicio?: string | null;
+          horario_dia_fin?: string | null;
+          horario_noche_inicio?: string | null;
+          horario_noche_fin?: string | null;
           largo_metros?: number | null;
           ancho_metros?: number | null;
           tiene_iluminacion?: boolean;
@@ -217,6 +229,12 @@ export interface Database {
           tipo_superficie?: 'grass_natural' | 'grass_sintetico' | 'cemento';
           capacidad?: '5v5' | '6v6' | '5v5_6v6';
           precio_hora?: number;
+          precio_dia?: number | null;
+          precio_noche?: number | null;
+          horario_dia_inicio?: string | null;
+          horario_dia_fin?: string | null;
+          horario_noche_inicio?: string | null;
+          horario_noche_fin?: string | null;
           largo_metros?: number | null;
           ancho_metros?: number | null;
           tiene_iluminacion?: boolean;

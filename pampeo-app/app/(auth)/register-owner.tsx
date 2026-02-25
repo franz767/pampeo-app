@@ -51,10 +51,86 @@ export default function RegisterOwnerScreen() {
   // Datos de la cancha
   const [nombreSede, setNombreSede] = useState('');
   const [location, setLocation] = useState<LocationData | null>(null);
-  const [numCanchas, setNumCanchas] = useState(1);
-  const [precioHora, setPrecioHora] = useState('');
   const [tipoSuperficie, setTipoSuperficie] = useState<'grass_natural' | 'grass_sintetico'>('grass_sintetico');
   const [fotos, setFotos] = useState<string[]>([]);
+
+  // Canchas con precios día/noche y horarios personalizados
+  interface CanchaForm {
+    precioDia: string;
+    precioNoche: string;
+    horaDiaInicio: string;
+    horaDiaFin: string;
+    horaNocheInicio: string;
+    horaNocheFin: string;
+  }
+  const [canchas, setCanchas] = useState<CanchaForm[]>([{
+    precioDia: '',
+    precioNoche: '',
+    horaDiaInicio: '08:00',
+    horaDiaFin: '17:00',
+    horaNocheInicio: '18:00',
+    horaNocheFin: '22:00',
+  }]);
+
+  // Opciones de horas para el selector
+  const horasDisponibles = [
+    '06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00',
+    '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00',
+    '20:00', '21:00', '22:00', '23:00', '00:00',
+  ];
+
+  const formatHora = (hora: string) => {
+    const [h] = hora.split(':');
+    const hour = parseInt(h);
+    if (hour === 0) return '12:00 am';
+    if (hour < 12) return `${hour}:00 am`;
+    if (hour === 12) return '12:00 pm';
+    return `${hour - 12}:00 pm`;
+  };
+
+  const addCancha = () => {
+    if (canchas.length < 10) {
+      setCanchas([...canchas, {
+        precioDia: '',
+        precioNoche: '',
+        horaDiaInicio: '08:00',
+        horaDiaFin: '17:00',
+        horaNocheInicio: '18:00',
+        horaNocheFin: '22:00',
+      }]);
+    }
+  };
+
+  const removeCancha = (index: number) => {
+    if (canchas.length > 1) {
+      setCanchas(canchas.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateCancha = (index: number, field: keyof CanchaForm, value: string) => {
+    const updated = [...canchas];
+    updated[index][field] = value;
+    setCanchas(updated);
+  };
+
+  // Modal para seleccionar hora
+  const [horaModalVisible, setHoraModalVisible] = useState(false);
+  const [horaModalData, setHoraModalData] = useState<{
+    canchaIndex: number;
+    field: keyof CanchaForm;
+  } | null>(null);
+
+  const openHoraModal = (canchaIndex: number, field: keyof CanchaForm) => {
+    setHoraModalData({ canchaIndex, field });
+    setHoraModalVisible(true);
+  };
+
+  const selectHora = (hora: string) => {
+    if (horaModalData) {
+      updateCancha(horaModalData.canchaIndex, horaModalData.field, hora);
+    }
+    setHoraModalVisible(false);
+  };
 
   // Map modal
   const [mapModalVisible, setMapModalVisible] = useState(false);
@@ -151,12 +227,17 @@ export default function RegisterOwnerScreen() {
           longitud: location.longitude,
           telefono_contacto: telefono.trim() || undefined,
         },
-        canchas: Array.from({ length: numCanchas }, (_, i) => ({
-          nombre: numCanchas === 1 ? 'Cancha 1' : `Cancha ${i + 1}`,
+        canchas: canchas.map((cancha, i) => ({
+          nombre: `Cancha ${i + 1}`,
           tipo_superficie: tipoSuperficie,
           capacidad: '5v5_6v6' as const,
-          precio_hora: parseFloat(precioHora) || 0,
-          foto_uri: fotos[0] || undefined,
+          precio_dia: parseFloat(cancha.precioDia) || 0,
+          precio_noche: parseFloat(cancha.precioNoche) || 0,
+          horario_dia_inicio: cancha.horaDiaInicio,
+          horario_dia_fin: cancha.horaDiaFin,
+          horario_noche_inicio: cancha.horaNocheInicio,
+          horario_noche_fin: cancha.horaNocheFin,
+          foto_uri: fotos[i] || fotos[0] || undefined,
         })),
       };
       await AsyncStorage.setItem(PENDING_SEDE_KEY, JSON.stringify(pendingData));
@@ -247,42 +328,117 @@ export default function RegisterOwnerScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Number of Fields + Price */}
-        <View style={styles.rowGroup}>
-          <View style={styles.halfGroup}>
-            <Text style={styles.label}>Número de Canchas</Text>
-            <View style={styles.counterContainer}>
-              <TouchableOpacity
-                style={[styles.counterButton, numCanchas <= 1 && styles.counterButtonDisabled]}
-                onPress={() => numCanchas > 1 && setNumCanchas(numCanchas - 1)}
-                disabled={numCanchas <= 1 || loading}
-              >
-                <Ionicons name="remove" size={22} color={numCanchas <= 1 ? colors.gray400 : colors.greenPrimary} />
-              </TouchableOpacity>
-              <Text style={styles.counterValue}>{numCanchas}</Text>
-              <TouchableOpacity
-                style={[styles.counterButton, numCanchas >= 10 && styles.counterButtonDisabled]}
-                onPress={() => numCanchas < 10 && setNumCanchas(numCanchas + 1)}
-                disabled={numCanchas >= 10 || loading}
-              >
-                <Ionicons name="add" size={22} color={numCanchas >= 10 ? colors.gray400 : colors.greenPrimary} />
-              </TouchableOpacity>
+        {/* Canchas con precios día/noche */}
+        {canchas.map((cancha, index) => (
+          <View key={index} style={styles.canchaCard}>
+            <View style={styles.canchaHeader}>
+              <Text style={styles.canchaTitle}>Cancha {index + 1}</Text>
+              {canchas.length > 1 && (
+                <TouchableOpacity
+                  style={styles.removeCanchaBtn}
+                  onPress={() => removeCancha(index)}
+                  disabled={loading}
+                >
+                  <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Precio Día */}
+            <View style={styles.precioSection}>
+              <View style={styles.precioHeader}>
+                <View style={styles.precioIconContainer}>
+                  <Ionicons name="sunny" size={20} color="#F59E0B" />
+                </View>
+                <Text style={styles.precioLabel}>Día</Text>
+                <View style={styles.precioPriceContainer}>
+                  <Text style={styles.precioPrefix}>S/</Text>
+                  <TextInput
+                    style={styles.precioInput}
+                    placeholder="50"
+                    placeholderTextColor={colors.gray400}
+                    value={cancha.precioDia}
+                    onChangeText={(value) => updateCancha(index, 'precioDia', value)}
+                    keyboardType="numeric"
+                    editable={!loading}
+                  />
+                </View>
+              </View>
+              <View style={styles.horarioRow}>
+                <TouchableOpacity
+                  style={styles.horaSelector}
+                  onPress={() => openHoraModal(index, 'horaDiaInicio')}
+                  disabled={loading}
+                >
+                  <Text style={styles.horaSelectorText}>{formatHora(cancha.horaDiaInicio)}</Text>
+                  <Ionicons name="chevron-down" size={16} color={colors.gray500} />
+                </TouchableOpacity>
+                <Text style={styles.horaSeparator}>a</Text>
+                <TouchableOpacity
+                  style={styles.horaSelector}
+                  onPress={() => openHoraModal(index, 'horaDiaFin')}
+                  disabled={loading}
+                >
+                  <Text style={styles.horaSelectorText}>{formatHora(cancha.horaDiaFin)}</Text>
+                  <Ionicons name="chevron-down" size={16} color={colors.gray500} />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Precio Noche */}
+            <View style={styles.precioSection}>
+              <View style={styles.precioHeader}>
+                <View style={[styles.precioIconContainer, styles.precioIconNoche]}>
+                  <Ionicons name="moon" size={20} color="#6366F1" />
+                </View>
+                <Text style={styles.precioLabel}>Noche</Text>
+                <View style={styles.precioPriceContainer}>
+                  <Text style={styles.precioPrefix}>S/</Text>
+                  <TextInput
+                    style={styles.precioInput}
+                    placeholder="80"
+                    placeholderTextColor={colors.gray400}
+                    value={cancha.precioNoche}
+                    onChangeText={(value) => updateCancha(index, 'precioNoche', value)}
+                    keyboardType="numeric"
+                    editable={!loading}
+                  />
+                </View>
+              </View>
+              <View style={styles.horarioRow}>
+                <TouchableOpacity
+                  style={styles.horaSelector}
+                  onPress={() => openHoraModal(index, 'horaNocheInicio')}
+                  disabled={loading}
+                >
+                  <Text style={styles.horaSelectorText}>{formatHora(cancha.horaNocheInicio)}</Text>
+                  <Ionicons name="chevron-down" size={16} color={colors.gray500} />
+                </TouchableOpacity>
+                <Text style={styles.horaSeparator}>a</Text>
+                <TouchableOpacity
+                  style={styles.horaSelector}
+                  onPress={() => openHoraModal(index, 'horaNocheFin')}
+                  disabled={loading}
+                >
+                  <Text style={styles.horaSelectorText}>{formatHora(cancha.horaNocheFin)}</Text>
+                  <Ionicons name="chevron-down" size={16} color={colors.gray500} />
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
+        ))}
 
-          <View style={styles.halfGroup}>
-            <Text style={styles.label}>Precio por Hora</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="S/ 0.00"
-              placeholderTextColor={colors.gray400}
-              value={precioHora}
-              onChangeText={setPrecioHora}
-              keyboardType="numeric"
-              editable={!loading}
-            />
-          </View>
-        </View>
+        {/* Botón agregar cancha */}
+        {canchas.length < 10 && (
+          <TouchableOpacity
+            style={styles.addCanchaBtn}
+            onPress={addCancha}
+            disabled={loading}
+          >
+            <Ionicons name="add-circle" size={24} color={colors.greenPrimary} />
+            <Text style={styles.addCanchaBtnText}>Agregar otra cancha</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Tipo de Superficie */}
         <View style={styles.inputGroup}>
@@ -417,6 +573,36 @@ export default function RegisterOwnerScreen() {
           )}
         </TouchableOpacity>
       </View>
+
+      {/* Modal Selector de Hora */}
+      <Modal
+        visible={horaModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setHoraModalVisible(false)}
+      >
+        <View style={styles.horaModalOverlay}>
+          <View style={styles.horaModalContent}>
+            <View style={styles.horaModalHeader}>
+              <Text style={styles.horaModalTitle}>Seleccionar hora</Text>
+              <TouchableOpacity onPress={() => setHoraModalVisible(false)}>
+                <Ionicons name="close" size={24} color={colors.gray500} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.horaModalScroll}>
+              {horasDisponibles.map((hora) => (
+                <TouchableOpacity
+                  key={hora}
+                  style={styles.horaOption}
+                  onPress={() => selectHora(hora)}
+                >
+                  <Text style={styles.horaOptionText}>{formatHora(hora)}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       {/* Map Modal */}
       <Modal visible={mapModalVisible} animationType="slide" onRequestClose={() => setMapModalVisible(false)}>
@@ -609,6 +795,169 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     color: colors.gray900,
+  },
+  // Cancha Card
+  canchaCard: {
+    backgroundColor: colors.gray50,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.gray200,
+  },
+  canchaHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  canchaTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.gray900,
+  },
+  removeCanchaBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#FEF2F2',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  precioSection: {
+    marginBottom: 16,
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: colors.gray200,
+  },
+  precioHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 10,
+  },
+  precioIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: '#FEF3C7',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  precioIconNoche: {
+    backgroundColor: '#EEF2FF',
+  },
+  precioLabel: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.gray900,
+  },
+  precioPriceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.gray50,
+    borderWidth: 1,
+    borderColor: colors.gray200,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    width: 90,
+  },
+  precioPrefix: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.gray500,
+    marginRight: 2,
+  },
+  precioInput: {
+    flex: 1,
+    paddingVertical: 8,
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.gray900,
+  },
+  horarioRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  horaSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.gray50,
+    borderWidth: 1,
+    borderColor: colors.gray200,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  horaSelectorText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.gray700,
+  },
+  horaSeparator: {
+    fontSize: 14,
+    color: colors.gray500,
+  },
+  // Modal de hora
+  horaModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  horaModalContent: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '60%',
+  },
+  horaModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray200,
+  },
+  horaModalTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.gray900,
+  },
+  horaModalScroll: {
+    paddingHorizontal: 16,
+  },
+  horaOption: {
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray100,
+  },
+  horaOptionText: {
+    fontSize: 16,
+    color: colors.gray900,
+    textAlign: 'center',
+  },
+  addCanchaBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    marginBottom: 20,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: colors.greenPrimary,
+    borderStyle: 'dashed',
+  },
+  addCanchaBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.greenPrimary,
   },
   // Surface
   surfaceOptions: {

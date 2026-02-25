@@ -69,13 +69,50 @@ export default function DashboardScreen() {
 
   // Cancha form
   const [canchaName, setCanchaName] = useState('');
-  const [precioHora, setPrecioHora] = useState('');
+  const [precioDia, setPrecioDia] = useState('');
+  const [precioNoche, setPrecioNoche] = useState('');
+  const [horaDiaInicio, setHoraDiaInicio] = useState('08:00');
+  const [horaDiaFin, setHoraDiaFin] = useState('17:00');
+  const [horaNocheInicio, setHoraNocheInicio] = useState('18:00');
+  const [horaNocheFin, setHoraNocheFin] = useState('22:00');
   const [tipoSuperficie, setTipoSuperficie] = useState<TipoSuperficie>('grass_sintetico');
   const [capacidad, setCapacidad] = useState<Capacidad>('5v5');
   const [tieneIluminacion, setTieneIluminacion] = useState(true);
   const [tieneVestuarios, setTieneVestuarios] = useState(false);
   const [tieneEstacionamiento, setTieneEstacionamiento] = useState(false);
   const [canchaFoto, setCanchaFoto] = useState<string | null>(null);
+
+  // Modal selector de hora
+  const [horaModalVisible, setHoraModalVisible] = useState(false);
+  const [horaModalField, setHoraModalField] = useState<'horaDiaInicio' | 'horaDiaFin' | 'horaNocheInicio' | 'horaNocheFin' | null>(null);
+
+  const horasDisponibles = [
+    '06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00',
+    '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00',
+    '20:00', '21:00', '22:00', '23:00', '00:00',
+  ];
+
+  const formatHora = (hora: string) => {
+    const [h] = hora.split(':');
+    const hour = parseInt(h);
+    if (hour === 0) return '12:00 am';
+    if (hour < 12) return `${hour}:00 am`;
+    if (hour === 12) return '12:00 pm';
+    return `${hour - 12}:00 pm`;
+  };
+
+  const openHoraModal = (field: 'horaDiaInicio' | 'horaDiaFin' | 'horaNocheInicio' | 'horaNocheFin') => {
+    setHoraModalField(field);
+    setHoraModalVisible(true);
+  };
+
+  const selectHora = (hora: string) => {
+    if (horaModalField === 'horaDiaInicio') setHoraDiaInicio(hora);
+    else if (horaModalField === 'horaDiaFin') setHoraDiaFin(hora);
+    else if (horaModalField === 'horaNocheInicio') setHoraNocheInicio(hora);
+    else if (horaModalField === 'horaNocheFin') setHoraNocheFin(hora);
+    setHoraModalVisible(false);
+  };
 
   // Edit mode
   const [editingCancha, setEditingCancha] = useState<(Cancha & { sedeName: string; sedeAddress: string }) | null>(null);
@@ -176,7 +213,12 @@ export default function DashboardScreen() {
     setSedeDistrito('');
     setSedeTelefono('');
     setCanchaName('');
-    setPrecioHora('');
+    setPrecioDia('');
+    setPrecioNoche('');
+    setHoraDiaInicio('08:00');
+    setHoraDiaFin('17:00');
+    setHoraNocheInicio('18:00');
+    setHoraNocheFin('22:00');
     setTipoSuperficie('grass_sintetico');
     setCapacidad('5v5');
     setTieneIluminacion(true);
@@ -201,7 +243,12 @@ export default function DashboardScreen() {
     resetForm();
     setEditingCancha(cancha);
     setCanchaName(cancha.nombre);
-    setPrecioHora(String(cancha.precio_hora));
+    setPrecioDia(String(cancha.precio_dia || cancha.precio_hora || ''));
+    setPrecioNoche(String(cancha.precio_noche || ''));
+    setHoraDiaInicio(cancha.horario_dia_inicio || '08:00');
+    setHoraDiaFin(cancha.horario_dia_fin || '17:00');
+    setHoraNocheInicio(cancha.horario_noche_inicio || '18:00');
+    setHoraNocheFin(cancha.horario_noche_fin || '22:00');
     setTipoSuperficie(cancha.tipo_superficie as TipoSuperficie);
     setCapacidad(cancha.capacidad as Capacidad);
     setTieneIluminacion(cancha.tiene_iluminacion);
@@ -258,8 +305,8 @@ export default function DashboardScreen() {
       Alert.alert('Error', 'El nombre de la cancha es obligatorio');
       return;
     }
-    if (!precioHora || parseFloat(precioHora) <= 0) {
-      Alert.alert('Error', 'El precio por hora debe ser mayor a 0');
+    if (!precioDia || parseFloat(precioDia) <= 0) {
+      Alert.alert('Error', 'El precio de día debe ser mayor a 0');
       return;
     }
     if (!dueno?.id) {
@@ -290,7 +337,13 @@ export default function DashboardScreen() {
         nombre: canchaName.trim(),
         tipo_superficie: tipoSuperficie,
         capacidad,
-        precio_hora: parseFloat(precioHora),
+        precio_hora: parseFloat(precioDia), // Mantener compatibilidad
+        precio_dia: parseFloat(precioDia),
+        precio_noche: parseFloat(precioNoche) || null,
+        horario_dia_inicio: horaDiaInicio,
+        horario_dia_fin: horaDiaFin,
+        horario_noche_inicio: horaNocheInicio,
+        horario_noche_fin: horaNocheFin,
         tiene_iluminacion: tieneIluminacion,
         tiene_vestuarios: tieneVestuarios,
         tiene_estacionamiento: tieneEstacionamiento,
@@ -441,8 +494,10 @@ export default function DashboardScreen() {
           />
         }
       >
-        {/* Section Title */}
-        <Text style={styles.sectionTitle}>Mis Canchas</Text>
+        {/* Section Title - Nombre de la sede principal */}
+        <Text style={styles.sectionTitle}>
+          {(sedes.length > 0 ? sedes[0].nombre : 'Mis Canchas').toUpperCase()}
+        </Text>
 
         {allCanchas.length === 0 ? (
           <View style={styles.emptyState}>
@@ -752,17 +807,86 @@ export default function DashboardScreen() {
                   />
                 </View>
 
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Precio por hora (S/) *</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Ej: 80"
-                    placeholderTextColor={colors.gray400}
-                    value={precioHora}
-                    onChangeText={setPrecioHora}
-                    keyboardType="numeric"
-                    editable={!saving}
-                  />
+                {/* Precio Día */}
+                <View style={styles.precioSection}>
+                  <View style={styles.precioHeader}>
+                    <View style={styles.precioIconContainer}>
+                      <Ionicons name="sunny" size={20} color="#F59E0B" />
+                    </View>
+                    <Text style={styles.precioLabel}>Día</Text>
+                    <View style={styles.precioPriceContainer}>
+                      <Text style={styles.precioPrefix}>S/</Text>
+                      <TextInput
+                        style={styles.precioInput}
+                        placeholder="50"
+                        placeholderTextColor={colors.gray400}
+                        value={precioDia}
+                        onChangeText={setPrecioDia}
+                        keyboardType="numeric"
+                        editable={!saving}
+                      />
+                    </View>
+                  </View>
+                  <View style={styles.horarioRow}>
+                    <TouchableOpacity
+                      style={styles.horaSelector}
+                      onPress={() => openHoraModal('horaDiaInicio')}
+                      disabled={saving}
+                    >
+                      <Text style={styles.horaSelectorText}>{formatHora(horaDiaInicio)}</Text>
+                      <Ionicons name="chevron-down" size={16} color={colors.gray500} />
+                    </TouchableOpacity>
+                    <Text style={styles.horaSeparator}>a</Text>
+                    <TouchableOpacity
+                      style={styles.horaSelector}
+                      onPress={() => openHoraModal('horaDiaFin')}
+                      disabled={saving}
+                    >
+                      <Text style={styles.horaSelectorText}>{formatHora(horaDiaFin)}</Text>
+                      <Ionicons name="chevron-down" size={16} color={colors.gray500} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Precio Noche */}
+                <View style={styles.precioSection}>
+                  <View style={styles.precioHeader}>
+                    <View style={[styles.precioIconContainer, styles.precioIconNoche]}>
+                      <Ionicons name="moon" size={20} color="#6366F1" />
+                    </View>
+                    <Text style={styles.precioLabel}>Noche</Text>
+                    <View style={styles.precioPriceContainer}>
+                      <Text style={styles.precioPrefix}>S/</Text>
+                      <TextInput
+                        style={styles.precioInput}
+                        placeholder="80"
+                        placeholderTextColor={colors.gray400}
+                        value={precioNoche}
+                        onChangeText={setPrecioNoche}
+                        keyboardType="numeric"
+                        editable={!saving}
+                      />
+                    </View>
+                  </View>
+                  <View style={styles.horarioRow}>
+                    <TouchableOpacity
+                      style={styles.horaSelector}
+                      onPress={() => openHoraModal('horaNocheInicio')}
+                      disabled={saving}
+                    >
+                      <Text style={styles.horaSelectorText}>{formatHora(horaNocheInicio)}</Text>
+                      <Ionicons name="chevron-down" size={16} color={colors.gray500} />
+                    </TouchableOpacity>
+                    <Text style={styles.horaSeparator}>a</Text>
+                    <TouchableOpacity
+                      style={styles.horaSelector}
+                      onPress={() => openHoraModal('horaNocheFin')}
+                      disabled={saving}
+                    >
+                      <Text style={styles.horaSelectorText}>{formatHora(horaNocheFin)}</Text>
+                      <Ionicons name="chevron-down" size={16} color={colors.gray500} />
+                    </TouchableOpacity>
+                  </View>
                 </View>
 
                 {/* Tipo superficie */}
@@ -894,6 +1018,36 @@ export default function DashboardScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
+      {/* Modal Selector de Hora */}
+      <Modal
+        visible={horaModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setHoraModalVisible(false)}
+      >
+        <View style={styles.horaModalOverlay}>
+          <View style={styles.horaModalContent}>
+            <View style={styles.horaModalHeader}>
+              <Text style={styles.horaModalTitle}>Seleccionar hora</Text>
+              <TouchableOpacity onPress={() => setHoraModalVisible(false)}>
+                <Ionicons name="close" size={24} color={colors.gray500} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.horaModalScroll}>
+              {horasDisponibles.map((hora) => (
+                <TouchableOpacity
+                  key={hora}
+                  style={styles.horaOption}
+                  onPress={() => selectHora(hora)}
+                >
+                  <Text style={styles.horaOptionText}>{formatHora(hora)}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 }
@@ -949,6 +1103,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.gray900,
     marginBottom: 16,
+    textAlign: 'center',
   },
   // Empty State
   emptyState: {
@@ -1433,5 +1588,124 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#EF4444',
+  },
+  // Precios día/noche
+  precioSection: {
+    marginBottom: 16,
+    backgroundColor: colors.gray50,
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: colors.gray200,
+  },
+  precioHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 10,
+  },
+  precioIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: '#FEF3C7',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  precioIconNoche: {
+    backgroundColor: '#EEF2FF',
+  },
+  precioLabel: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.gray900,
+  },
+  precioPriceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.gray200,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    width: 90,
+  },
+  precioPrefix: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.gray500,
+    marginRight: 2,
+  },
+  precioInput: {
+    flex: 1,
+    paddingVertical: 8,
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.gray900,
+  },
+  horarioRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  horaSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.gray200,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  horaSelectorText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.gray700,
+  },
+  horaSeparator: {
+    fontSize: 14,
+    color: colors.gray500,
+  },
+  // Modal de hora
+  horaModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  horaModalContent: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '60%',
+  },
+  horaModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray200,
+  },
+  horaModalTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.gray900,
+  },
+  horaModalScroll: {
+    paddingHorizontal: 16,
+  },
+  horaOption: {
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray100,
+  },
+  horaOptionText: {
+    fontSize: 16,
+    color: colors.gray900,
+    textAlign: 'center',
   },
 });
