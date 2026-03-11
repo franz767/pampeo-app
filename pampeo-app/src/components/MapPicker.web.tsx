@@ -3,10 +3,8 @@ import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 interface MapPickerProps {
-  tempMarker: { latitude: number; longitude: number } | null;
-  defaultLocation: { latitude: number; longitude: number };
-  onMapPress: (event: any) => void;
-  onMarkerDragEnd: (coordinate: { latitude: number; longitude: number }) => void;
+  initialLocation: { latitude: number; longitude: number };
+  onRegionChanged: (coords: { latitude: number; longitude: number }) => void;
 }
 
 export default function MapPicker(_props: MapPickerProps) {

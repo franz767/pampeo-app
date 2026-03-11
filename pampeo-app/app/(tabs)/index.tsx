@@ -47,6 +47,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const mapRef = useRef<MapView>(null);
+  const scrollRef = useRef<ScrollView>(null);
   const { location, loading: locationLoading } = useLocation();
   const { canchas, loading: canchasLoading } = useCanchas();
 
@@ -95,6 +96,17 @@ export default function HomeScreen() {
 
   const handleMarkerPress = (cancha: CanchaConSede) => {
     setSelectedCancha(cancha);
+
+    // Scroll to the corresponding card in the bottom sheet
+    const index = filteredCanchas.findIndex(c => c.id === cancha.id);
+    if (index >= 0 && scrollRef.current) {
+      scrollRef.current.scrollTo({
+        x: index * (CARD_WIDTH + 12),
+        animated: true,
+      });
+    }
+
+    // Animate map to the marker
     if (cancha.sede?.latitud && cancha.sede?.longitud) {
       mapRef.current?.animateToRegion({
         latitude: Number(cancha.sede.latitud),
@@ -235,11 +247,27 @@ export default function HomeScreen() {
         </View>
 
         <ScrollView
+          ref={scrollRef}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.canchasScroll}
           snapToInterval={CARD_WIDTH + 12}
           decelerationRate="fast"
+          onMomentumScrollEnd={(e) => {
+            const index = Math.round(e.nativeEvent.contentOffset.x / (CARD_WIDTH + 12));
+            const cancha = filteredCanchas[index];
+            if (cancha && cancha.id !== selectedCancha?.id) {
+              setSelectedCancha(cancha);
+              if (cancha.sede?.latitud && cancha.sede?.longitud) {
+                mapRef.current?.animateToRegion({
+                  latitude: Number(cancha.sede.latitud),
+                  longitude: Number(cancha.sede.longitud),
+                  latitudeDelta: 0.01,
+                  longitudeDelta: 0.01,
+                }, 500);
+              }
+            }
+          }}
         >
           {filteredCanchas.map((cancha) => (
             <TouchableOpacity

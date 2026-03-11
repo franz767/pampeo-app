@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -134,8 +134,11 @@ export default function RegisterOwnerScreen() {
 
   // Map modal
   const [mapModalVisible, setMapModalVisible] = useState(false);
-  const [tempMarker, setTempMarker] = useState<LocationData | null>(null);
+  const [mapCenter, setMapCenter] = useState<{ latitude: number; longitude: number }>(DEFAULT_LOCATION);
+  const [mapAddress, setMapAddress] = useState<{ city: string; street: string } | null>(null);
   const [loadingLocation, setLoadingLocation] = useState(false);
+  const [geocoding, setGeocoding] = useState(false);
+  const geocodeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const openMapPicker = async () => {
     setLoadingLocation(true);
@@ -145,42 +148,60 @@ export default function RegisterOwnerScreen() {
         const currentLocation = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.Balanced,
         });
-        setTempMarker({
+        const coords = {
           latitude: currentLocation.coords.latitude,
           longitude: currentLocation.coords.longitude,
-        });
+        };
+        setMapCenter(coords);
+        reverseGeocode(coords);
       } else {
-        setTempMarker(DEFAULT_LOCATION);
+        setMapCenter(location || DEFAULT_LOCATION);
       }
     } catch {
-      setTempMarker(location || DEFAULT_LOCATION);
+      setMapCenter(location || DEFAULT_LOCATION);
     }
     setLoadingLocation(false);
     setMapModalVisible(true);
   };
 
-  const handleMapPress = (event: any) => {
-    const { latitude, longitude } = event.nativeEvent.coordinate;
-    setTempMarker({ latitude, longitude });
+  const reverseGeocode = async (coords: { latitude: number; longitude: number }) => {
+    setGeocoding(true);
+    try {
+      const [address] = await Location.reverseGeocodeAsync(coords);
+      if (address) {
+        const city = address.city || address.district || address.subregion || address.region || '';
+        const streetParts = [address.street, address.streetNumber].filter(Boolean);
+        const street = streetParts.length > 0 ? streetParts.join(' ') : address.name || '';
+        setMapAddress({ city, street });
+      } else {
+        setMapAddress(null);
+      }
+    } catch {
+      setMapAddress(null);
+    }
+    setGeocoding(false);
   };
 
-  const confirmLocation = async () => {
-    if (!tempMarker) return;
-    try {
-      const [address] = await Location.reverseGeocodeAsync({
-        latitude: tempMarker.latitude,
-        longitude: tempMarker.longitude,
-      });
-      const addressString = address
-        ? `${address.street || ''} ${address.streetNumber || ''}, ${address.district || address.city || ''}`
-        : `${tempMarker.latitude.toFixed(6)}, ${tempMarker.longitude.toFixed(6)}`;
-      setLocation({ ...tempMarker, address: addressString.trim() });
-    } catch {
-      setLocation({
-        ...tempMarker,
-        address: `${tempMarker.latitude.toFixed(6)}, ${tempMarker.longitude.toFixed(6)}`,
-      });
-    }
+  const handleRegionChanged = (coords: { latitude: number; longitude: number }) => {
+    setMapCenter(coords);
+    // Debounce reverse geocoding
+    if (geocodeTimeoutRef.current) clearTimeout(geocodeTimeoutRef.current);
+    geocodeTimeoutRef.current = setTimeout(() => reverseGeocode(coords), 500);
+  };
+
+  const confirmLocation = () => {
+    const addressParts = [];
+    if (mapAddress?.street) addressParts.push(mapAddress.street);
+    if (mapAddress?.city) addressParts.push(mapAddress.city);
+    const addressString = addressParts.length > 0
+      ? addressParts.join(', ')
+      : `${mapCenter.latitude.toFixed(6)}, ${mapCenter.longitude.toFixed(6)}`;
+
+    setLocation({
+      latitude: mapCenter.latitude,
+      longitude: mapCenter.longitude,
+      address: addressString,
+    });
     setMapModalVisible(false);
   };
 
@@ -607,35 +628,55 @@ export default function RegisterOwnerScreen() {
       {/* Map Modal */}
       <Modal visible={mapModalVisible} animationType="slide" onRequestClose={() => setMapModalVisible(false)}>
         <View style={styles.mapModalContainer}>
-          <View style={styles.mapHeader}>
-            <TouchableOpacity onPress={() => setMapModalVisible(false)}>
-              <Ionicons name="close" size={28} color={colors.gray900} />
-            </TouchableOpacity>
-            <Text style={styles.mapTitle}>Selecciona la ubicación</Text>
-            <TouchableOpacity onPress={confirmLocation} disabled={!tempMarker}>
-              <Text style={[styles.confirmText, !tempMarker && { color: colors.gray200 }]}>Confirmar</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.mapInstructions}>
-            <Ionicons name="finger-print" size={18} color={colors.gray500} />
-            <Text style={styles.instructionsText}>Toca en el mapa para marcar la ubicación de tu cancha</Text>
-          </View>
+          {/* Back button overlay */}
+          <TouchableOpacity
+            style={styles.mapBackButton}
+            onPress={() => setMapModalVisible(false)}
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.gray900} />
+          </TouchableOpacity>
 
           <MapPicker
-            tempMarker={tempMarker}
-            defaultLocation={DEFAULT_LOCATION}
-            onMapPress={handleMapPress}
-            onMarkerDragEnd={(coord) => setTempMarker(coord)}
+            initialLocation={mapCenter}
+            onRegionChanged={handleRegionChanged}
           />
 
-          {tempMarker && (
-            <View style={styles.coordsDisplay}>
-              <Text style={styles.coordsText}>
-                {tempMarker.latitude.toFixed(6)}, {tempMarker.longitude.toFixed(6)}
-              </Text>
+          {/* Bottom card with address */}
+          <View style={styles.mapBottomCard}>
+            <Text style={styles.mapBottomTitle}>Confirmar dirección</Text>
+            <Text style={styles.mapBottomSubtitle}>Mueve el mapa para cambiar la ubicación</Text>
+
+            <View style={styles.mapAddressContainer}>
+              {geocoding ? (
+                <ActivityIndicator size="small" color={colors.greenPrimary} style={{ marginVertical: 8 }} />
+              ) : mapAddress ? (
+                <>
+                  {mapAddress.city ? (
+                    <Text style={styles.mapAddressCity}>{mapAddress.city}</Text>
+                  ) : null}
+                  {mapAddress.street ? (
+                    <Text style={styles.mapAddressStreet}>{mapAddress.street}</Text>
+                  ) : null}
+                  {!mapAddress.city && !mapAddress.street && (
+                    <Text style={styles.mapAddressStreet}>
+                      {mapCenter.latitude.toFixed(6)}, {mapCenter.longitude.toFixed(6)}
+                    </Text>
+                  )}
+                </>
+              ) : (
+                <Text style={styles.mapAddressStreet}>
+                  {mapCenter.latitude.toFixed(6)}, {mapCenter.longitude.toFixed(6)}
+                </Text>
+              )}
             </View>
-          )}
+
+            <TouchableOpacity
+              style={styles.mapConfirmButton}
+              onPress={confirmLocation}
+            >
+              <Text style={styles.mapConfirmButtonText}>Continuar</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
     </KeyboardAvoidingView>
@@ -1076,55 +1117,75 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.white,
   },
-  mapHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 60 : 16,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray200,
-  },
-  mapTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.gray900,
-  },
-  confirmText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.greenPrimary,
-  },
-  mapInstructions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    padding: 12,
-    backgroundColor: colors.gray50,
-  },
-  instructionsText: {
-    fontSize: 13,
-    color: colors.gray500,
-  },
-  coordsDisplay: {
+  mapBackButton: {
     position: 'absolute',
-    bottom: 20,
-    left: 20,
-    right: 20,
+    top: Platform.OS === 'ios' ? 56 : 16,
+    left: 16,
+    zIndex: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: colors.white,
-    borderRadius: 14,
-    padding: 12,
+    justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.15,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 4,
   },
-  coordsText: {
-    fontSize: 14,
-    fontWeight: '600',
+  mapBottomCard: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  mapBottomTitle: {
+    fontSize: 20,
+    fontWeight: '800',
     color: colors.gray900,
+    marginBottom: 4,
+  },
+  mapBottomSubtitle: {
+    fontSize: 14,
+    color: colors.gray500,
+    marginBottom: 16,
+  },
+  mapAddressContainer: {
+    marginBottom: 20,
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  mapAddressCity: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.gray900,
+    marginBottom: 2,
+  },
+  mapAddressStreet: {
+    fontSize: 14,
+    color: colors.gray500,
+  },
+  mapConfirmButton: {
+    backgroundColor: colors.greenPrimary,
+    borderRadius: 14,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  mapConfirmButtonText: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.white,
   },
 });

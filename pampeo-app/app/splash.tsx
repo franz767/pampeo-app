@@ -78,12 +78,14 @@ export default function SplashScreen() {
   // Navegar cuando esté listo
   useEffect(() => {
     if (!initialized) return;
+    // Wait for loading to finish so perfil is fully resolved
+    if (isAuthenticated && !perfil) return;
 
     const timer = setTimeout(() => {
       if (!isAuthenticated) {
         router.replace('/(auth)/role-selection');
       } else if (perfil?.rol === 'dueno') {
-        router.replace('/(owner)/dashboard');
+        router.replace('/(owner)/(ownerTabs)');
       } else {
         router.replace('/(tabs)');
       }

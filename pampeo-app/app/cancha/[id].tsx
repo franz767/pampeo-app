@@ -20,6 +20,7 @@ import TimeSlotGrid, { TimeSlot } from '../../src/components/booking/TimeSlotGri
 import BookingFooter from '../../src/components/booking/BookingFooter';
 import { canchasService, CanchaConSede } from '../../src/services/canchas.service';
 import { partidosService } from '../../src/services/partidos.service';
+import { duenosService } from '../../src/services/duenos.service';
 import { useAuth } from '../../src/hooks/useAuth';
 import { colors } from '../../src/theme';
 
@@ -45,11 +46,14 @@ export default function CanchaDetailScreen() {
   const [selectedFormato, setSelectedFormato] = useState<'5v5' | '6v6'>('5v5');
   const [cancha, setCancha] = useState<CanchaConSede | null>(null);
   const [horarios, setHorarios] = useState<Horario[]>([]);
-  const [horariosOcupados, setHorariosOcupados] = useState<string[]>([]);
+  const [horariosOcupados, setHorariosOcupados] = useState<{ hora: string; estado: string; creador_id?: string; partido_id?: string }[]>([]);
   const [loadingCancha, setLoadingCancha] = useState(true);
   const [bookingLoading, setBookingLoading] = useState(false);
   const [modalStep, setModalStep] = useState<ModalStep>(null);
   const [reservaConfirmada, setReservaConfirmada] = useState<any>(null);
+  const [datosYape, setDatosYape] = useState<{ numero_yape: string; nombre_yape: string; qr_yape_url?: string | null } | null>(null);
+  const [duenoTelefono, setDuenoTelefono] = useState<string>('');
+  const [duenoPerfilId, setDuenoPerfilId] = useState<string>('');
 
   useEffect(() => {
     if (!id) return;
@@ -61,9 +65,32 @@ export default function CanchaDetailScreen() {
         ]);
         setCancha(canchaData);
         setHorarios(horariosData || []);
-        // Set default formato based on cancha capacity
         if (canchaData?.capacidad === '6v6') {
           setSelectedFormato('6v6');
+        }
+        // Fetch Yape data del dueño
+        if (canchaData?.sede?.id) {
+          try {
+            const yape = await duenosService.getDatosYapePorSede(canchaData.sede.id);
+            setDatosYape(yape);
+          } catch (e) {
+            console.error('Error fetching yape data:', e);
+          }
+          // Fetch dueno telefono and perfil_id
+          try {
+            const { data: sedeData } = await (await import('../../src/services/supabase')).supabase
+              .from('sedes')
+              .select('dueno:duenos!dueno_id(perfil_id, perfil:perfiles!perfil_id(telefono))')
+              .eq('id', canchaData.sede.id)
+              .single();
+            const dueno = (sedeData as any)?.dueno;
+            if (dueno) {
+              setDuenoPerfilId(dueno.perfil_id || '');
+              setDuenoTelefono(dueno.perfil?.telefono || canchaData.sede.telefono_contacto || '');
+            }
+          } catch (e) {
+            console.error('Error fetching dueno info:', e);
+          }
         }
       } catch (err) {
         console.error('Error fetching cancha:', err);
@@ -88,6 +115,19 @@ export default function CanchaDetailScreen() {
     fetchOcupados();
   }, [id, selectedDate]);
 
+  // Determinar precio según hora (día o noche)
+  const getPrecioParaHora = (hora: string): number => {
+    if (!cancha) return 0;
+    const nocheInicio = cancha.horario_noche_inicio?.substring(0, 5);
+    if (nocheInicio && hora >= nocheInicio && cancha.precio_noche != null) {
+      return cancha.precio_noche;
+    }
+    if (cancha.precio_dia != null) {
+      return cancha.precio_dia;
+    }
+    return cancha.precio_hora || 0;
+  };
+
   // Convert horarios to TimeSlot[] based on selected date's day of week
   const slots: TimeSlot[] = useMemo(() => {
     const dayOfWeek = new Date(selectedDate + 'T12:00:00').getDay();
@@ -95,23 +135,39 @@ export default function CanchaDetailScreen() {
     return dayHorarios
       .map((h) => {
         const hora = h.hora_inicio.substring(0, 5);
-        const ocupado = horariosOcupados.includes(hora);
+        const match = horariosOcupados.find((o) => o.hora === hora);
+        let estado: 'disponible' | 'ocupado' | 'pendiente' | 'mi_pendiente' = 'disponible';
+        let partidoId: string | undefined;
+        if (match) {
+          if (match.estado === 'en_verificacion') {
+            // If it's the current user's pending reservation, let them tap it
+            if (match.creador_id === user?.id) {
+              estado = 'mi_pendiente';
+              partidoId = match.partido_id;
+            } else {
+              estado = 'pendiente';
+            }
+          } else {
+            estado = 'ocupado';
+          }
+        }
         return {
           hora,
-          precio: cancha?.precio_hora || 0,
-          estado: ocupado ? 'ocupado' as const : 'disponible' as const,
+          precio: getPrecioParaHora(hora),
+          estado,
+          partidoId,
         };
       })
       .sort((a, b) => a.hora.localeCompare(b.hora));
-  }, [selectedDate, horarios, cancha, horariosOcupados]);
+  }, [selectedDate, horarios, cancha, horariosOcupados, user?.id]);
 
   // Reset selection when date changes
   useEffect(() => {
     setSelectedSlot(null);
   }, [selectedDate]);
 
-  // Calcular precios
-  const precioCancha = cancha?.precio_hora || 0;
+  // Calcular precios según slot seleccionado
+  const precioCancha = selectedSlot ? getPrecioParaHora(selectedSlot) : (cancha?.precio_hora || 0);
   const adelanto50 = precioCancha / 2;
   const totalAPagar = adelanto50 + COMISION_PAMPEO;
   const restanteAlDueno = precioCancha - adelanto50;
@@ -129,6 +185,13 @@ export default function CanchaDetailScreen() {
   };
 
   const handleSelectReservar = () => {
+    if (!datosYape) {
+      Alert.alert(
+        'Yape no configurado',
+        'El dueño de esta cancha aún no ha configurado sus datos de Yape. Intenta más tarde o contacta al dueño.'
+      );
+      return;
+    }
     setModalStep('booking');
   };
 
@@ -139,23 +202,14 @@ export default function CanchaDetailScreen() {
   };
 
   const handleConfirmReserva = async () => {
-    if (!user?.id || !jugador?.id || !cancha || !selectedSlot || !selectedDate) return;
-
-    const saldo = jugador.saldo || 0;
-    if (saldo < totalAPagar) {
-      Alert.alert(
-        'Saldo Insuficiente',
-        `Necesitas S/${totalAPagar.toFixed(2)} para reservar.\nTu saldo actual: S/${saldo.toFixed(2)}`,
-      );
-      return;
-    }
+    if (!user?.id || !cancha || !selectedSlot || !selectedDate) return;
 
     setBookingLoading(true);
     try {
       const [h, m] = selectedSlot.split(':').map(Number);
       const horaFin = `${String(h + 1).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 
-      // Crear reserva (partido tipo reserva)
+      // Crear reserva (partido tipo reserva, estado en_verificacion)
       const partido = await partidosService.crearReserva({
         cancha_id: cancha.id,
         creador_id: user.id,
@@ -168,29 +222,28 @@ export default function CanchaDetailScreen() {
         comision_pampeo: COMISION_PAMPEO,
       });
 
-      // Descontar saldo del jugador
-      await partidosService.descontarSaldo(jugador.id, totalAPagar);
-
-      // Refrescar datos del usuario y horarios ocupados
-      await refreshUserData();
+      // Refrescar horarios ocupados
       const ocupados = await partidosService.getHorariosOcupados(cancha.id, selectedDate);
       setHorariosOcupados(ocupados);
 
-      // Guardar datos de confirmación
-      setReservaConfirmada({
-        cancha: cancha.nombre,
-        sede: cancha.sede?.nombre,
-        fecha: selectedDate,
-        hora: selectedSlot,
-        formato: selectedFormato,
-        pagado: totalAPagar,
-        restante: restanteAlDueno,
-        duenoNombre: cancha.sede?.dueno?.perfil?.nombre_completo || 'Dueño',
-        duenoTelefono: cancha.sede?.telefono_contacto || '999 999 999',
-        partidoId: partido.id,
+      // Cerrar modal y navegar a pantalla de pago Yape
+      setModalStep(null);
+      setSelectedSlot(null);
+      router.push({
+        pathname: '/pago/yape',
+        params: {
+          reservaId: partido.id,
+          monto: adelanto50.toFixed(2),
+          canchaName: `${cancha.nombre} • ${cancha.sede?.nombre || ''}`,
+          fecha: formatDate(selectedDate),
+          hora: selectedSlot,
+          numeroYape: datosYape?.numero_yape || '',
+          nombreYape: datosYape?.nombre_yape || '',
+          duenoTelefono: duenoTelefono,
+          duenoPerfilId: duenoPerfilId,
+          formato: selectedFormato,
+        },
       });
-
-      setModalStep('confirmation');
     } catch (err: any) {
       Alert.alert('Error', err.message || 'No se pudo completar la reserva');
     } finally {
@@ -202,6 +255,33 @@ export default function CanchaDetailScreen() {
     setModalStep(null);
     setSelectedSlot(null);
     router.replace('/(tabs)/mis-partidos');
+  };
+
+  const handlePendientePress = async (partidoId: string) => {
+    try {
+      const partido = await partidosService.getPartidoById(partidoId);
+      if (!partido) return;
+      const hora = partido.hora_inicio?.substring(0, 5) || '';
+      const precioFromCancha = getPrecioParaHora(hora);
+      const adelanto = partido.adelanto_pagado || (partido.precio_cancha ? partido.precio_cancha / 2 : precioFromCancha / 2);
+      router.push({
+        pathname: '/pago/yape',
+        params: {
+          reservaId: partido.id,
+          monto: adelanto.toFixed(2),
+          canchaName: `${cancha?.nombre} • ${cancha?.sede?.nombre || ''}`,
+          fecha: formatDate(partido.fecha),
+          hora: hora,
+          numeroYape: datosYape?.numero_yape || '',
+          nombreYape: datosYape?.nombre_yape || '',
+          duenoTelefono: duenoTelefono,
+          duenoPerfilId: duenoPerfilId,
+          formato: partido.formato || '5v5',
+        },
+      });
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'No se pudo cargar la reserva');
+    }
   };
 
   const handleContactarWhatsApp = () => {
@@ -262,26 +342,43 @@ export default function CanchaDetailScreen() {
         {/* Content */}
         <View style={styles.content}>
           <View style={styles.titleRow}>
-            <Text style={styles.venueName}>{cancha?.sede?.nombre || 'Cancha'}</Text>
+            <Text style={styles.canchaName}>{cancha?.nombre || 'Cancha'}</Text>
             <View style={styles.statusBadge}>
               <Text style={styles.statusText}>ABIERTO</Text>
             </View>
           </View>
+
+          <Text style={styles.sedeName}>{cancha?.sede?.nombre}</Text>
 
           <View style={styles.addressRow}>
             <Ionicons name="location" size={16} color={colors.greenPrimary} />
             <Text style={styles.addressText}>{cancha?.sede?.direccion || 'Sin dirección'}</Text>
           </View>
 
-          <View style={styles.ratingRow}>
-            <Text style={styles.ratingValue}>4.8</Text>
-            <View style={styles.stars}>
-              {[1, 2, 3, 4, 5].map((star) => (
-                <Ionicons key={star} name={star <= 4 ? 'star' : 'star-half'} size={16} color={colors.yellow} />
-              ))}
+          {(cancha?.total_resenas || 0) > 0 ? (
+            <View style={styles.ratingRow}>
+              <Text style={styles.ratingValue}>{(cancha?.calificacion_promedio || 0).toFixed(1)}</Text>
+              <View style={styles.stars}>
+                {[1, 2, 3, 4, 5].map((star) => {
+                  const rating = cancha?.calificacion_promedio || 0;
+                  return (
+                    <Ionicons
+                      key={star}
+                      name={star <= Math.floor(rating) ? 'star' : star <= rating + 0.5 ? 'star-half' : 'star-outline'}
+                      size={16}
+                      color={colors.yellow}
+                    />
+                  );
+                })}
+              </View>
+              <Text style={styles.reviewCount}>({cancha?.total_resenas} reseñas)</Text>
             </View>
-            <Text style={styles.reviewCount}>(120 reseñas)</Text>
-          </View>
+          ) : (
+            <View style={styles.ratingRow}>
+              <Ionicons name="star-outline" size={16} color={colors.gray400} />
+              <Text style={styles.reviewCount}>Sin reseñas aún</Text>
+            </View>
+          )}
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tagsContainer}>
             <View style={styles.tag}>
@@ -298,6 +395,16 @@ export default function CanchaDetailScreen() {
               <View style={styles.tag}>
                 <Ionicons name="shirt-outline" size={14} color={colors.gray700} />
                 <Text style={styles.tagText}>Vestuarios</Text>
+              </View>
+            )}
+            <View style={styles.priceTag}>
+              <Ionicons name="sunny-outline" size={14} color={colors.greenPrimary} />
+              <Text style={styles.priceTagText}>Día S/{cancha?.precio_dia || cancha?.precio_hora || 0}</Text>
+            </View>
+            {cancha?.precio_noche != null && (
+              <View style={styles.priceTag}>
+                <Ionicons name="moon-outline" size={14} color={colors.greenPrimary} />
+                <Text style={styles.priceTagText}>Noche S/{cancha?.precio_noche}</Text>
               </View>
             )}
           </ScrollView>
@@ -318,7 +425,7 @@ export default function CanchaDetailScreen() {
               <Text style={styles.noSlotsText}>Sin horarios disponibles para este día</Text>
             </View>
           ) : (
-            <TimeSlotGrid slots={slots} selectedSlot={selectedSlot} onSlotSelect={handleSelectSlot} />
+            <TimeSlotGrid slots={slots} selectedSlot={selectedSlot} onSlotSelect={handleSelectSlot} onPendientePress={handlePendientePress} />
           )}
 
           <View style={{ height: 100 }} />
@@ -463,7 +570,7 @@ export default function CanchaDetailScreen() {
               ) : (
                 <>
                   <Ionicons name="card" size={20} color={colors.white} />
-                  <Text style={styles.confirmButtonText}>RESERVAR Y PAGAR S/{totalAPagar.toFixed(2)}</Text>
+                  <Text style={styles.confirmButtonText}>RESERVAR Y PAGAR CON YAPE</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -540,7 +647,8 @@ const styles = StyleSheet.create({
   heroButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' },
   content: { padding: 20 },
   titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  venueName: { fontSize: 24, fontWeight: '800', color: colors.gray900, flex: 1 },
+  canchaName: { fontSize: 24, fontWeight: '800', color: colors.gray900, flex: 1 },
+  sedeName: { fontSize: 14, fontWeight: '500', color: colors.gray500, marginBottom: 6 },
   statusBadge: { backgroundColor: colors.greenLight, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: colors.greenBorder },
   statusText: { fontSize: 11, fontWeight: '700', color: colors.greenPrimary },
   addressRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
@@ -552,6 +660,8 @@ const styles = StyleSheet.create({
   tagsContainer: { gap: 10, marginBottom: 4 },
   tag: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: colors.gray50, borderWidth: 1, borderColor: colors.gray200 },
   tagText: { fontSize: 13, fontWeight: '500', color: colors.gray700 },
+  priceTag: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: colors.greenLight, borderWidth: 1, borderColor: colors.greenBorder },
+  priceTagText: { fontSize: 13, fontWeight: '600', color: colors.greenPrimary },
   divider: { height: 1, backgroundColor: colors.gray100, marginVertical: 20 },
   sectionTitle: { fontSize: 18, fontWeight: '700', color: colors.gray900, marginBottom: 14 },
   timesHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, marginBottom: 0 },

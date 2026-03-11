@@ -100,6 +100,9 @@ export interface Database {
           banco: string | null;
           cuenta_bancaria: string | null;
           verificado: boolean;
+          numero_yape: string | null;
+          nombre_yape: string | null;
+          qr_yape_url: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -111,6 +114,9 @@ export interface Database {
           banco?: string | null;
           cuenta_bancaria?: string | null;
           verificado?: boolean;
+          numero_yape?: string | null;
+          nombre_yape?: string | null;
+          qr_yape_url?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -122,6 +128,9 @@ export interface Database {
           banco?: string | null;
           cuenta_bancaria?: string | null;
           verificado?: boolean;
+          numero_yape?: string | null;
+          nombre_yape?: string | null;
+          qr_yape_url?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -195,6 +204,8 @@ export interface Database {
           foto_url: string | null;
           activo: boolean;
           aprobado: boolean;
+          calificacion_promedio: number;
+          total_resenas: number;
           created_at: string;
           updated_at: string;
         };
@@ -219,6 +230,8 @@ export interface Database {
           foto_url?: string | null;
           activo?: boolean;
           aprobado?: boolean;
+          calificacion_promedio?: number;
+          total_resenas?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -243,6 +256,8 @@ export interface Database {
           foto_url?: string | null;
           activo?: boolean;
           aprobado?: boolean;
+          calificacion_promedio?: number;
+          total_resenas?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -289,7 +304,8 @@ export interface Database {
           max_jugadores: number;
           jugadores_confirmados: number;
           precio_por_jugador: number;
-          estado: 'abierto' | 'lleno' | 'en_curso' | 'finalizado' | 'cancelado' | 'reservado';
+          estado: 'abierto' | 'lleno' | 'en_curso' | 'finalizado' | 'cancelado' | 'reservado' | 'en_verificacion' | 'rechazado';
+          comprobante_url: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -305,7 +321,8 @@ export interface Database {
           max_jugadores: number;
           jugadores_confirmados?: number;
           precio_por_jugador: number;
-          estado?: 'abierto' | 'lleno' | 'en_curso' | 'finalizado' | 'cancelado' | 'reservado';
+          estado?: 'abierto' | 'lleno' | 'en_curso' | 'finalizado' | 'cancelado' | 'reservado' | 'en_verificacion' | 'rechazado';
+          comprobante_url?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -321,7 +338,8 @@ export interface Database {
           max_jugadores?: number;
           jugadores_confirmados?: number;
           precio_por_jugador?: number;
-          estado?: 'abierto' | 'lleno' | 'en_curso' | 'finalizado' | 'cancelado' | 'reservado';
+          estado?: 'abierto' | 'lleno' | 'en_curso' | 'finalizado' | 'cancelado' | 'reservado' | 'en_verificacion' | 'rechazado';
+          comprobante_url?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -474,6 +492,35 @@ export interface Database {
           created_at?: string;
         };
       };
+      resenas: {
+        Row: {
+          id: string;
+          cancha_id: string;
+          jugador_id: string;
+          partido_id: string;
+          calificacion: number;
+          comentario: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          cancha_id: string;
+          jugador_id: string;
+          partido_id: string;
+          calificacion: number;
+          comentario?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          cancha_id?: string;
+          jugador_id?: string;
+          partido_id?: string;
+          calificacion?: number;
+          comentario?: string | null;
+          created_at?: string;
+        };
+      };
     };
     Views: {};
     Functions: {};
@@ -492,3 +539,4 @@ export type JugadorPartido = Database['public']['Tables']['jugadores_partido']['
 export type Transaccion = Database['public']['Tables']['transacciones']['Row'];
 export type Notificacion = Database['public']['Tables']['notificaciones']['Row'];
 export type MensajePartido = Database['public']['Tables']['mensajes_partido']['Row'];
+export type Resena = Database['public']['Tables']['resenas']['Row'];

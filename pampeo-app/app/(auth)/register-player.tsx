@@ -17,6 +17,8 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/hooks/useAuth';
 import AvatarPicker from '../../src/components/ui/AvatarPicker';
 import PositionSelector from '../../src/components/ui/PositionSelector';
+import { storageService } from '../../src/services/storage.service';
+import { supabase } from '../../src/services/supabase';
 import { colors } from '../../src/theme';
 
 import { Position } from '../../src/components/ui/PositionSelector';
@@ -56,6 +58,16 @@ export default function RegisterPlayerScreen() {
         posicion: posiciones.length > 0 ? posiciones.join(',') : undefined,
         telefono: telefono.trim() || undefined,
       });
+
+      // Subir avatar si el usuario eligió una foto
+      if (avatarUri && result.user?.id) {
+        try {
+          const avatarUrl = await storageService.uploadAvatar(result.user.id, avatarUri);
+          await supabase.from('perfiles').update({ avatar_url: avatarUrl }).eq('id', result.user.id);
+        } catch (e) {
+          console.error('Error uploading avatar:', e);
+        }
+      }
 
       // Si Supabase creó la sesión directamente (sin confirmación de email)
       if (result.session) {

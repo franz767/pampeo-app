@@ -21,16 +21,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
-import { useAuth } from '../../src/hooks/useAuth';
+import { useAuth } from '../../../src/hooks/useAuth';
 
-import { useSedes } from '../../src/hooks/useSedes';
-import { sedesService } from '../../src/services/sedes.service';
-import { partidosService } from '../../src/services/partidos.service';
-import { storageService } from '../../src/services/storage.service';
-import { Cancha } from '../../src/types/database.types';
+import { useSedes } from '../../../src/hooks/useSedes';
+import { sedesService } from '../../../src/services/sedes.service';
+import { partidosService } from '../../../src/services/partidos.service';
+import { storageService } from '../../../src/services/storage.service';
+import { Cancha } from '../../../src/types/database.types';
 // @ts-ignore
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../../src/theme';
+import { colors } from '../../../src/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -253,8 +253,8 @@ export default function DashboardScreen() {
     resetForm();
     setEditingCancha(cancha);
     setCanchaName(cancha.nombre);
-    setPrecioDia(String(cancha.precio_dia || cancha.precio_hora || ''));
-    setPrecioNoche(String(cancha.precio_noche || ''));
+    setPrecioDia(cancha.precio_dia != null ? String(cancha.precio_dia) : String(cancha.precio_hora || ''));
+    setPrecioNoche(cancha.precio_noche != null ? String(cancha.precio_noche) : '');
     setHoraDiaInicio(cancha.horario_dia_inicio || '08:00');
     setHoraDiaFin(cancha.horario_dia_fin || '17:00');
     setHoraNocheInicio(cancha.horario_noche_inicio || '18:00');
@@ -496,8 +496,8 @@ export default function DashboardScreen() {
               <Text style={styles.headerRole}>Administrador</Text>
             </View>
           </View>
-          <TouchableOpacity style={styles.logoutBtn} onPress={handleSignOut}>
-            <Ionicons name="log-out-outline" size={20} color="rgba(255,255,255,0.7)" />
+          <TouchableOpacity style={styles.logoutBtn} onPress={() => router.push('/(owner)/(ownerTabs)/perfil')}>
+            <Ionicons name="settings-outline" size={20} color="rgba(255,255,255,0.7)" />
           </TouchableOpacity>
         </View>
 
@@ -559,11 +559,11 @@ export default function DashboardScreen() {
               <View key={sede.id} style={styles.sedeSection}>
                 {/* Sede Section Header */}
                 <View style={styles.sedeSectionHeader}>
-                  <View style={styles.sedeIconBox}>
-                    <Ionicons name="location" size={16} color={colors.greenPrimary} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.sedeSectionTitle}>{sede.nombre}</Text>
+                  <View style={styles.sedeHeaderCenter}>
+                    <View style={styles.sedeIconBox}>
+                      <Ionicons name="location" size={16} color={colors.greenPrimary} />
+                    </View>
+                    <Text style={styles.sedeSectionTitle}>{sede.nombre.toUpperCase()}</Text>
                     <Text style={styles.sedeSectionAddress} numberOfLines={1}>{sede.direccion}</Text>
                   </View>
                   <Text style={styles.sedeCanchaCount}>
@@ -598,21 +598,13 @@ export default function DashboardScreen() {
                       </View>
 
                       <View style={styles.canchaInfo}>
-                        {/* Edit/Delete icons in top-right */}
-                        <View style={styles.cardActions}>
-                          <TouchableOpacity
-                            style={styles.cardActionBtn}
-                            onPress={() => openEditModal(cancha)}
-                          >
-                            <Ionicons name="create-outline" size={16} color={colors.gray500} />
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={styles.cardActionBtn}
-                            onPress={() => handleDeleteCancha(cancha.id, cancha.nombre)}
-                          >
-                            <Ionicons name="trash-outline" size={16} color="#EF4444" />
-                          </TouchableOpacity>
-                        </View>
+                        {/* Delete icon in top-right corner */}
+                        <TouchableOpacity
+                          style={styles.deleteCornerBtn}
+                          onPress={() => handleDeleteCancha(cancha.id, cancha.nombre)}
+                        >
+                          <Ionicons name="trash-outline" size={14} color="#EF4444" />
+                        </TouchableOpacity>
 
                         <Text style={styles.canchaName}>{cancha.nombre}</Text>
 
@@ -628,10 +620,28 @@ export default function DashboardScreen() {
                           </View>
                         </View>
 
-                        {/* Price */}
-                        <View style={styles.priceRow}>
-                          <Text style={styles.priceAmount}>S/{cancha.precio_hora}</Text>
-                          <Text style={styles.priceUnit}>/hora</Text>
+                        {/* Prices */}
+                        <View style={styles.pricesContainer}>
+                          {cancha.precio_dia != null && (
+                            <View style={styles.priceRow}>
+                              <Ionicons name="sunny" size={13} color="#F59E0B" />
+                              <Text style={styles.priceAmount}>S/{cancha.precio_dia}</Text>
+                              <Text style={styles.priceUnit}>día</Text>
+                            </View>
+                          )}
+                          {cancha.precio_noche != null && cancha.precio_noche > 0 && (
+                            <View style={styles.priceRow}>
+                              <Ionicons name="moon" size={13} color="#6366F1" />
+                              <Text style={[styles.priceAmount, { color: '#6366F1' }]}>S/{cancha.precio_noche}</Text>
+                              <Text style={styles.priceUnit}>noche</Text>
+                            </View>
+                          )}
+                          {cancha.precio_dia == null && cancha.precio_noche == null && (
+                            <View style={styles.priceRow}>
+                              <Text style={styles.priceAmount}>S/{cancha.precio_hora}</Text>
+                              <Text style={styles.priceUnit}>/hora</Text>
+                            </View>
+                          )}
                         </View>
 
                         {/* Service icons only */}
@@ -670,15 +680,11 @@ export default function DashboardScreen() {
                       </TouchableOpacity>
 
                       <TouchableOpacity
-                        style={styles.reservasBtn}
-                        onPress={() =>
-                          router.push(
-                            `/(owner)/reservas/${cancha.id}?nombre=${encodeURIComponent(cancha.nombre)}`
-                          )
-                        }
+                        style={styles.editarBtn}
+                        onPress={() => openEditModal(cancha)}
                       >
-                        <Ionicons name="calendar-outline" size={16} color="#2563EB" />
-                        <Text style={styles.reservasBtnText}>Reservas</Text>
+                        <Ionicons name="create-outline" size={16} color="#F59E0B" />
+                        <Text style={styles.editarBtnText}>Editar</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -1197,11 +1203,13 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   sedeSectionHeader: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
     marginBottom: 12,
     paddingHorizontal: 4,
+  },
+  sedeHeaderCenter: {
+    alignItems: 'center',
+    marginBottom: 4,
   },
   sedeIconBox: {
     width: 32,
@@ -1212,14 +1220,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sedeSectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 17,
+    fontWeight: '800',
     color: colors.gray900,
+    textAlign: 'center',
+    letterSpacing: 1,
+    marginTop: 6,
   },
   sedeSectionAddress: {
     fontSize: 12,
     color: colors.gray500,
-    marginTop: 1,
+    textAlign: 'center',
+    marginTop: 2,
   },
   sedeCanchaCount: {
     fontSize: 12,
@@ -1322,27 +1334,24 @@ const styles = StyleSheet.create({
     padding: 12,
     justifyContent: 'center',
   },
-  cardActions: {
+  deleteCornerBtn: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    flexDirection: 'row',
-    gap: 4,
-  },
-  cardActionBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: colors.gray50,
+    top: 6,
+    right: 6,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#FEF2F2',
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 1,
   },
   canchaName: {
     fontSize: 17,
     fontWeight: '800',
     color: colors.gray900,
     marginBottom: 6,
-    paddingRight: 60,
+    paddingRight: 32,
   },
   tagsRow: {
     flexDirection: 'row',
@@ -1362,20 +1371,23 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.gray700,
   },
-  priceRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
+  pricesContainer: {
+    gap: 3,
     marginBottom: 8,
   },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
   priceAmount: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '800',
     color: colors.greenPrimary,
   },
   priceUnit: {
-    fontSize: 12,
+    fontSize: 11,
     color: colors.gray400,
-    marginLeft: 2,
   },
   servicesRow: {
     flexDirection: 'row',
@@ -1426,6 +1438,23 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: '#2563EB',
+  },
+  editarBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#FEF3C7',
+    borderRadius: 10,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  editarBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#D97706',
   },
   // FAB
   fab: {

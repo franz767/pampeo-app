@@ -11,6 +11,7 @@ interface RoleCardProps {
   selected: boolean;
   onPress: () => void;
   icon?: string;
+  compact?: boolean;
 }
 
 export default function RoleCard({
@@ -20,38 +21,43 @@ export default function RoleCard({
   selected,
   onPress,
   icon,
+  compact,
 }: RoleCardProps) {
   return (
     <TouchableOpacity
       activeOpacity={0.85}
       onPress={onPress}
-      style={[styles.container, selected && styles.containerSelected]}
+      style={[
+        styles.container,
+        compact && styles.containerCompact,
+        selected && styles.containerSelected,
+      ]}
     >
       <ImageBackground
         source={imageSource}
         style={styles.imageBg}
-        imageStyle={styles.imageStyle}
+        imageStyle={compact ? styles.imageStyleCompact : styles.imageStyle}
         resizeMode="cover"
       >
         <LinearGradient
-          colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.85)']}
-          style={styles.gradient}
+          colors={['rgba(0,0,0,0.05)', 'rgba(0,0,0,0.88)']}
+          style={[styles.gradient, compact && styles.gradientCompact]}
         >
           {/* Selected checkmark */}
           {selected && (
-            <View style={styles.checkBadge}>
-              <Ionicons name="checkmark" size={16} color={colors.white} />
+            <View style={[styles.checkBadge, compact && styles.checkBadgeCompact]}>
+              <Ionicons name="checkmark" size={compact ? 14 : 16} color={colors.white} />
             </View>
           )}
 
           <View style={styles.content}>
             {icon && (
-              <View style={styles.iconBox}>
-                <Ionicons name={icon as any} size={22} color={colors.white} />
+              <View style={[styles.iconBox, compact && styles.iconBoxCompact]}>
+                <Ionicons name={icon as any} size={compact ? 18 : 22} color={colors.white} />
               </View>
             )}
-            <Text style={styles.title}>{title}</Text>
-            <Text style={styles.description}>{description}</Text>
+            <Text style={[styles.title, compact && styles.titleCompact]}>{title}</Text>
+            <Text style={[styles.description, compact && styles.descriptionCompact]}>{description}</Text>
           </View>
         </LinearGradient>
       </ImageBackground>
@@ -73,6 +79,13 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 5,
   },
+  containerCompact: {
+    height: 220,
+    borderRadius: 16,
+    marginBottom: 0,
+    borderWidth: 2.5,
+    overflow: 'hidden',
+  },
   containerSelected: {
     borderColor: colors.greenPrimary,
   },
@@ -82,10 +95,16 @@ const styles = StyleSheet.create({
   imageStyle: {
     borderRadius: 17,
   },
+  imageStyleCompact: {
+    borderRadius: 13,
+  },
   gradient: {
     flex: 1,
     justifyContent: 'flex-end',
     padding: 22,
+  },
+  gradientCompact: {
+    padding: 14,
   },
   checkBadge: {
     position: 'absolute',
@@ -103,8 +122,15 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 4,
   },
+  checkBadgeCompact: {
+    top: 10,
+    right: 10,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+  },
   content: {
-    gap: 6,
+    gap: 4,
   },
   iconBox: {
     width: 40,
@@ -115,15 +141,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 4,
   },
+  iconBoxCompact: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    marginBottom: 2,
+  },
   title: {
     fontSize: 22,
     fontWeight: '800',
     color: colors.white,
     letterSpacing: -0.3,
   },
+  titleCompact: {
+    fontSize: 17,
+    letterSpacing: -0.2,
+  },
   description: {
     fontSize: 13,
     color: 'rgba(255,255,255,0.75)',
     lineHeight: 18,
+  },
+  descriptionCompact: {
+    fontSize: 11,
+    lineHeight: 15,
   },
 });

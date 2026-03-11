@@ -1,61 +1,96 @@
-import { View, Text, StyleSheet, Platform } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import { View, StyleSheet } from 'react-native';
+import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
 // @ts-ignore
 import { Ionicons } from '@expo/vector-icons';
 
 interface MapPickerProps {
-  tempMarker: { latitude: number; longitude: number } | null;
-  defaultLocation: { latitude: number; longitude: number };
-  onMapPress: (event: any) => void;
-  onMarkerDragEnd: (coordinate: { latitude: number; longitude: number }) => void;
+  initialLocation: { latitude: number; longitude: number };
+  onRegionChanged: (coords: { latitude: number; longitude: number }) => void;
 }
 
 export default function MapPicker({
-  tempMarker,
-  defaultLocation,
-  onMapPress,
-  onMarkerDragEnd,
+  initialLocation,
+  onRegionChanged,
 }: MapPickerProps) {
   return (
-    <MapView
-      style={styles.map}
-      provider={PROVIDER_GOOGLE}
-      initialRegion={{
-        latitude: tempMarker?.latitude || defaultLocation.latitude,
-        longitude: tempMarker?.longitude || defaultLocation.longitude,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      }}
-      onPress={onMapPress}
-      showsUserLocation
-    >
-      {tempMarker && (
-        <Marker
-          coordinate={{
-            latitude: tempMarker.latitude,
-            longitude: tempMarker.longitude,
-          }}
-          draggable
-          onDragEnd={(e: any) => onMarkerDragEnd(e.nativeEvent.coordinate)}
-        >
-          <View style={styles.customMarker}>
-            <Ionicons name="football" size={24} color="#fff" />
-          </View>
-        </Marker>
-      )}
-    </MapView>
+    <View style={styles.container}>
+      <MapView
+        style={styles.map}
+        provider={PROVIDER_GOOGLE}
+        initialRegion={{
+          latitude: initialLocation.latitude,
+          longitude: initialLocation.longitude,
+          latitudeDelta: 0.005,
+          longitudeDelta: 0.005,
+        }}
+        onRegionChangeComplete={(region) => {
+          onRegionChanged({
+            latitude: region.latitude,
+            longitude: region.longitude,
+          });
+        }}
+        showsUserLocation
+        showsMyLocationButton
+      />
+      {/* Fixed center pin */}
+      <View style={styles.pinContainer} pointerEvents="none">
+        <View style={styles.pinShadow} />
+        <View style={styles.pin}>
+          <Ionicons name="football" size={22} color="#fff" />
+        </View>
+        <View style={styles.pinStick} />
+        <View style={styles.pinDot} />
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    position: 'relative',
+  },
   map: {
     flex: 1,
   },
-  customMarker: {
+  pinContainer: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginLeft: -20,
+    marginTop: -52,
+    alignItems: 'center',
+    width: 40,
+  },
+  pin: {
     backgroundColor: '#10B981',
     borderRadius: 20,
-    padding: 10,
+    padding: 8,
     borderWidth: 3,
     borderColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  pinStick: {
+    width: 3,
+    height: 10,
+    backgroundColor: '#10B981',
+  },
+  pinDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10B981',
+  },
+  pinShadow: {
+    position: 'absolute',
+    bottom: -4,
+    width: 20,
+    height: 6,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0,0,0,0.15)',
   },
 });

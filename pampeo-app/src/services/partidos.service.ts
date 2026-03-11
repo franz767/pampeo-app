@@ -323,20 +323,39 @@ export const partidosService = {
   },
 
   // Obtener horarios reservados/ocupados para una cancha en una fecha
-  async getHorariosOcupados(canchaId: string, fecha: string): Promise<string[]> {
+  async getHorariosOcupados(canchaId: string, fecha: string): Promise<{ hora: string; estado: string; creador_id?: string; partido_id?: string }[]> {
     const { data, error } = await supabase
       .from('partidos')
-      .select('hora_inicio')
+      .select('id, hora_inicio, estado, creador_id')
       .eq('cancha_id', canchaId)
       .eq('fecha', fecha)
-      .in('estado', ['abierto', 'lleno', 'en_curso', 'reservado']);
+      .in('estado', ['abierto', 'lleno', 'en_curso', 'reservado', 'en_verificacion']);
 
     if (error) throw error;
-    return (data || []).map((p) => p.hora_inicio.substring(0, 5));
+    return (data || []).map((p) => ({
+      hora: p.hora_inicio.substring(0, 5),
+      estado: p.estado,
+      creador_id: p.creador_id,
+      partido_id: p.id,
+    }));
   },
 
   // Crear una reserva de cancha (modelo 50% adelanto)
   async crearReserva(input: CrearReservaInput): Promise<Partido> {
+    // Verificar disponibilidad antes de crear (evitar doble reserva)
+    const { data: existente } = await supabase
+      .from('partidos')
+      .select('id')
+      .eq('cancha_id', input.cancha_id)
+      .eq('fecha', input.fecha)
+      .eq('hora_inicio', input.hora_inicio)
+      .in('estado', ['abierto', 'lleno', 'en_curso', 'reservado', 'en_verificacion'])
+      .maybeSingle();
+
+    if (existente) {
+      throw new Error('Este horario acaba de ser reservado por otro jugador. Elige otro horario.');
+    }
+
     const maxJugadores = input.formato === '5v5' ? 10 : 12;
 
     const { data, error } = await supabase
@@ -349,10 +368,13 @@ export const partidosService = {
         hora_inicio: input.hora_inicio,
         hora_fin: input.hora_fin,
         tipo: 'reserva',
-        estado: 'reservado',
+        estado: 'en_verificacion',
         max_jugadores: maxJugadores,
         jugadores_confirmados: 0,
         precio_por_jugador: Math.ceil(input.precio_cancha / maxJugadores),
+        precio_cancha: input.precio_cancha,
+        adelanto_pagado: input.adelanto_pagado,
+        comision_pampeo: input.comision_pampeo,
       })
       .select()
       .single();
@@ -397,11 +419,80 @@ export const partidosService = {
       .eq('cancha_id', canchaId)
       .eq('tipo', 'reserva')
       .neq('estado', 'cancelado')
+      .neq('estado', 'rechazado')
       .order('fecha', { ascending: true })
       .order('hora_inicio', { ascending: true });
 
     if (error) throw error;
     return data || [];
+  },
+
+  // Obtener reservas por confirmar (estado en_verificacion) para el dueño
+  async getReservasPorConfirmar(canchaIds: string[]): Promise<any[]> {
+    if (canchaIds.length === 0) return [];
+    const { data, error } = await supabase
+      .from('partidos')
+      .select(`
+        *,
+        cancha:canchas(*),
+        creador:perfiles!creador_id(
+          id, nombre_completo, telefono, avatar_url
+        )
+      `)
+      .in('cancha_id', canchaIds)
+      .eq('tipo', 'reserva')
+      .eq('estado', 'en_verificacion')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  // Confirmar reserva (dueño verificó el pago)
+  async confirmarReserva(reservaId: string): Promise<void> {
+    const { error } = await supabase
+      .from('partidos')
+      .update({ estado: 'reservado' })
+      .eq('id', reservaId)
+      .eq('estado', 'en_verificacion');
+
+    if (error) throw error;
+  },
+
+  // Confirmar pago total (jugador pagó el 50% restante al llegar)
+  async confirmarPagoTotal(reservaId: string): Promise<void> {
+    const { error } = await supabase
+      .from('partidos')
+      .update({ estado: 'finalizado' })
+      .eq('id', reservaId)
+      .eq('estado', 'reservado');
+
+    if (error) throw error;
+  },
+
+  // Rechazar reserva (dueño no verificó el pago)
+  async rechazarReserva(reservaId: string): Promise<void> {
+    const { error } = await supabase
+      .from('partidos')
+      .update({ estado: 'rechazado' })
+      .eq('id', reservaId)
+      .eq('estado', 'en_verificacion');
+
+    if (error) throw error;
+  },
+
+  // Crear notificación en la app
+  async crearNotificacion(
+    perfilId: string,
+    titulo: string,
+    mensaje: string,
+    tipo: 'invitacion' | 'confirmacion' | 'pago' | 'recordatorio' | 'sistema' = 'sistema'
+  ): Promise<void> {
+    const { error } = await supabase
+      .from('notificaciones')
+      .insert({ perfil_id: perfilId, titulo, mensaje, tipo });
+
+    if (error) throw error;
   },
 
   // Obtener mis reservas
@@ -417,11 +508,54 @@ export const partidosService = {
       `)
       .eq('creador_id', creadorId)
       .eq('tipo', 'reserva')
-      .neq('estado', 'cancelado')
       .order('fecha', { ascending: true })
       .order('hora_inicio', { ascending: true });
 
     if (error) throw error;
     return (data as unknown as ReservaConDetalles[]) || [];
+  },
+
+  // Subir comprobante de Yape y actualizar reserva
+  async subirComprobanteYape(reservaId: string, comprobanteUrl: string): Promise<void> {
+    const { error } = await supabase
+      .from('partidos')
+      .update({ comprobante_url: comprobanteUrl })
+      .eq('id', reservaId);
+
+    if (error) throw error;
+  },
+
+  // Crear reseña de cancha
+  async crearResena(
+    canchaId: string,
+    jugadorId: string,
+    partidoId: string,
+    calificacion: number,
+    comentario?: string
+  ): Promise<void> {
+    const { error } = await supabase
+      .from('resenas')
+      .insert({
+        cancha_id: canchaId,
+        jugador_id: jugadorId,
+        partido_id: partidoId,
+        calificacion,
+        comentario: comentario || null,
+      });
+
+    if (error) throw error;
+  },
+
+  // Verificar si ya dejó reseña para un partido
+  async getResenaDePartido(partidoId: string, jugadorId: string): Promise<boolean> {
+    const { data, error } = await supabase
+      .from('resenas')
+      .select('id')
+      .eq('partido_id', partidoId)
+      .eq('jugador_id', jugadorId)
+      .maybeSingle();
+
+    if (error) throw error;
+    return !!data;
   },
 };

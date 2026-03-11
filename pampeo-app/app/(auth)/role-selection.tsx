@@ -17,7 +17,7 @@ import RoleCard from '../../src/components/ui/RoleCard';
 import { colors } from '../../src/theme';
 
 const playerImage = { uri: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&q=80' };
-const fieldImage = { uri: 'https://images.unsplash.com/photo-1556056504-5c7696c4c28d?w=800&q=80' };
+const fieldImage = { uri: 'https://images.unsplash.com/photo-1459865264687-595d652de67e?w=800&q=80' };
 
 type Role = 'jugador' | 'dueno' | null;
 
@@ -222,24 +222,26 @@ export default function RoleSelectionScreen() {
         </Animated.Text>
 
         <View style={styles.cardsContainer}>
-          <Animated.View style={{ opacity: card1Opacity, transform: [{ translateY: card1TranslateY }] }}>
+          <Animated.View style={[styles.cardWrapper, { opacity: card1Opacity, transform: [{ translateY: card1TranslateY }] }]}>
             <RoleCard
               title="Soy Jugador"
-              description="Únete a partidos locales, registra tus stats y encuentra equipos cerca de ti."
+              description="Únete a partidos y encuentra equipos cerca de ti."
               imageSource={playerImage}
               selected={selectedRole === 'jugador'}
               onPress={() => setSelectedRole('jugador')}
               icon="football"
+              compact
             />
           </Animated.View>
-          <Animated.View style={{ opacity: card2Opacity, transform: [{ translateY: card2TranslateY }] }}>
+          <Animated.View style={[styles.cardWrapper, { opacity: card2Opacity, transform: [{ translateY: card2TranslateY }] }]}>
             <RoleCard
-              title="Soy Dueño de Cancha"
-              description="Publica tus canchas, gestiona reservas en tiempo real y haz crecer tu comunidad."
+              title="Soy Dueño"
+              description="Publica tus canchas y gestiona reservas."
               imageSource={fieldImage}
               selected={selectedRole === 'dueno'}
               onPress={() => setSelectedRole('dueno')}
               icon="business"
+              compact
             />
           </Animated.View>
         </View>
@@ -270,12 +272,16 @@ export default function RoleSelectionScreen() {
           </TouchableOpacity>
 
           {/* Login Link */}
-          <View style={styles.loginLinkContainer}>
-            <Text style={styles.loginText}>¿Ya tienes cuenta? </Text>
-            <TouchableOpacity onPress={() => router.push('/(auth)/login')}>
-              <Text style={styles.loginLink}>Inicia sesión</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            style={styles.loginButton}
+            onPress={() => router.push('/(auth)/login')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.loginButtonInner}>
+              <Ionicons name="log-in-outline" size={18} color={colors.greenPrimary} />
+              <Text style={styles.loginButtonText}>¿Ya tienes cuenta? <Text style={styles.loginButtonBold}>Inicia sesión</Text></Text>
+            </View>
+          </TouchableOpacity>
         </Animated.View>
       </View>
     </View>
@@ -368,7 +374,12 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   cardsContainer: {
-    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+  },
+  cardWrapper: {
+    width: '48%',
   },
   continueButton: {
     borderRadius: 16,
@@ -391,18 +402,26 @@ const styles = StyleSheet.create({
   continueTextDisabled: {
     color: colors.gray400,
   },
-  loginLinkContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
+  loginButton: {
     marginBottom: 30,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: colors.greenPrimary,
+    backgroundColor: 'rgba(34,197,94,0.06)',
   },
-  loginText: {
-    fontSize: 14,
-    color: colors.gray500,
+  loginButtonInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 15,
   },
-  loginLink: {
-    fontSize: 14,
-    fontWeight: '700',
+  loginButtonText: {
+    fontSize: 15,
+    color: colors.gray700,
+  },
+  loginButtonBold: {
+    fontWeight: '800',
     color: colors.greenPrimary,
   },
 });

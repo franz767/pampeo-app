@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { usePartido } from '../../src/hooks/usePartido';
 import { useAuth } from '../../src/hooks/useAuth';
 import { JugadorPartidoConPerfil } from '../../src/services/partidos.service';
+import { supabase } from '../../src/services/supabase';
 import { colors } from '../../src/theme';
 
 const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
@@ -57,6 +58,31 @@ export default function PartidoDetailScreen() {
     salir,
     cancelar,
   } = usePartido(id || '', jugador?.id, user?.id);
+
+  const [duenoNombre, setDuenoNombre] = useState<string>('');
+  const [duenoTelefono, setDuenoTelefono] = useState<string>('');
+
+  // Fetch owner info for reserva contact section
+  useEffect(() => {
+    if (!partido?.cancha?.sede_id) return;
+    const fetchDueno = async () => {
+      try {
+        const { data } = await supabase
+          .from('sedes')
+          .select('dueno:duenos!dueno_id(perfil:perfiles!perfil_id(nombre_completo, telefono))')
+          .eq('id', partido.cancha!.sede_id)
+          .single();
+        const perfil = (data as any)?.dueno?.perfil;
+        if (perfil) {
+          setDuenoNombre(perfil.nombre_completo || '');
+          setDuenoTelefono(perfil.telefono || '');
+        }
+      } catch (e) {
+        console.error('Error fetching dueno info:', e);
+      }
+    };
+    fetchDueno();
+  }, [partido?.cancha?.sede_id]);
 
   const handleUnirse = async () => {
     try {
@@ -245,16 +271,16 @@ export default function PartidoDetailScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.reservaContactName}>
-                  {partido.cancha?.sede?.nombre}
+                  {duenoNombre || partido.cancha?.sede?.nombre}
                 </Text>
                 <Text style={styles.reservaContactPhone}>
-                  {partido.cancha?.sede?.telefono_contacto || 'Sin teléfono'}
+                  {duenoTelefono || partido.cancha?.sede?.telefono_contacto || 'Sin teléfono'}
                 </Text>
               </View>
               <TouchableOpacity
                 style={styles.reservaWhatsappBtn}
                 onPress={() => {
-                  const tel = partido.cancha?.sede?.telefono_contacto?.replace(/\s/g, '');
+                  const tel = (duenoTelefono || partido.cancha?.sede?.telefono_contacto || '').replace(/\s/g, '');
                   const msg = `Hola! Reservé la cancha ${partido.cancha?.nombre} para el ${formatFechaLarga(partido.fecha)} a las ${formatHora(partido.hora_inicio)}. Reservé por Pampeo.`;
                   Alert.alert('WhatsApp', `Contactar al ${tel}\n\n${msg}`);
                 }}
@@ -265,28 +291,8 @@ export default function PartidoDetailScreen() {
             </View>
           </View>
 
-          <View style={{ height: 100 }} />
+          <View style={{ height: 30 }} />
         </ScrollView>
-
-        {/* Footer - Cancelar reserva */}
-        {partido.estado !== 'cancelado' && (
-          <View style={styles.footer}>
-            <TouchableOpacity
-              style={styles.cancelBtn}
-              onPress={handleCancelar}
-              disabled={actionLoading}
-            >
-              {actionLoading ? (
-                <ActivityIndicator color={colors.red} />
-              ) : (
-                <>
-                  <Ionicons name="close-circle-outline" size={20} color={colors.red} />
-                  <Text style={styles.cancelBtnText}>Cancelar Reserva</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </View>
-        )}
 
         {partido.estado === 'cancelado' && (
           <View style={styles.footer}>
